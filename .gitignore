@@ -46,6 +46,3 @@ app.*.map.json
 
 # Claude Code local state
 .claude/
-
-# GitHub Pages serves from here — but don't ignore it
-!/docs/

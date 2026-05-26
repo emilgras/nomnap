@@ -5,6 +5,7 @@ import '../services/statistics.dart';
 import '../theme/app_theme.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
+import 'app_shell.dart' show kFloatingNavReserve;
 
 class StatsScreen extends StatefulWidget {
   final EventStore store;
@@ -53,7 +54,7 @@ class _StatsScreenState extends State<StatsScreen> {
               16,
               4,
               16,
-              MediaQuery.of(context).padding.bottom + 24,
+              MediaQuery.of(context).padding.bottom + kFloatingNavReserve,
             ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([

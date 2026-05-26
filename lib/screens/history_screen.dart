@@ -6,6 +6,7 @@ import '../services/event_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
+import 'app_shell.dart' show kFloatingNavReserve;
 import 'tracker_screen.dart' show SessionRow;
 
 class HistoryScreen extends StatefulWidget {
@@ -281,7 +282,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 16,
                 4,
                 16,
-                MediaQuery.of(context).padding.bottom + 24,
+                MediaQuery.of(context).padding.bottom + kFloatingNavReserve,
               ),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +13,7 @@ import '../theme/app_theme.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
 import 'add_entry_sheet.dart';
+import 'app_shell.dart' show kFloatingNavReserve;
 
 class TrackerScreen extends StatefulWidget {
   final EventStore store;
@@ -65,44 +67,41 @@ class _TrackerScreenState extends State<TrackerScreen> {
     final stats = Statistics(store.events);
     final today = stats.statsForDay(DateTime.now());
 
+    final topInset = MediaQuery.of(context).padding.top;
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       child: CustomScrollView(
         slivers: [
-          CupertinoSliverNavigationBar(
-            largeTitle: SvgPicture.asset(
-              'assets/logo/nomnap_wordmark.svg',
-              height: 38,
-              semanticsLabel: 'NomNap',
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _NomNapStickyHeader(
+              topInset: topInset,
+              onAdd: () => AddEntrySheet.show(context, widget.store),
             ),
-            backgroundColor: AppColors.background,
-            border: null,
-            bottom: const PreferredSize(
-              preferredSize: Size.fromHeight(10),
-              child: SizedBox.shrink(),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              16,
+              20,
+              4,
             ),
-            trailing: CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(32, 32),
-              onPressed: () => AddEntrySheet.show(context, widget.store),
-              child: const Icon(
-                CupertinoIcons.add_circled_solid,
-                color: AppColors.sleepAccent,
-                size: 28,
+            sliver: SliverToBoxAdapter(
+              child: Text(
+                _greetingForHour(DateTime.now().hour),
+                style: AppText.subhead,
               ),
             ),
           ),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(
               16,
-              4,
+              12,
               16,
-              MediaQuery.of(context).padding.bottom + 24,
+              MediaQuery.of(context).padding.bottom + kFloatingNavReserve,
             ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _Greeting(store: store),
-                const SizedBox(height: 16),
                 _ActionCard(
                   title: 'Sleep',
                   active: isSleeping,
@@ -145,28 +144,91 @@ class _TrackerScreenState extends State<TrackerScreen> {
   }
 }
 
-class _Greeting extends StatelessWidget {
-  final EventStore store;
-  const _Greeting({required this.store});
+String _greetingForHour(int h) {
+  if (h < 5) return 'Good night';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
-  String _greeting() {
-    final h = DateTime.now().hour;
-    if (h < 5) return 'Good night';
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
-  }
+const double _kHeaderContentHeight = 72;
+
+class _NomNapStickyHeader extends SliverPersistentHeaderDelegate {
+  final double topInset;
+  final VoidCallback onAdd;
+  const _NomNapStickyHeader({required this.topInset, required this.onAdd});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Text(
-        _greeting(),
-        style: AppText.subhead,
+  double get minExtent => _kHeaderContentHeight + topInset;
+  @override
+  double get maxExtent => _kHeaderContentHeight + topInset;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(
+          decoration: BoxDecoration(
+            // White-tinted glass that reads as distinct from the gray scaffold
+            // even when there's nothing behind to blur (i.e. at scroll origin).
+            color: CupertinoColors.white.withValues(alpha: 0.72),
+            border: Border(
+              bottom: BorderSide(
+                color: AppColors.divider
+                    .withValues(alpha: overlapsContent ? 1.0 : 0.4),
+                width: 0.5,
+              ),
+            ),
+          ),
+          padding: EdgeInsets.only(top: topInset),
+          child: SizedBox(
+            height: _kHeaderContentHeight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 12, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SvgPicture.asset(
+                    'assets/logo/nomnap_mark_compact.svg',
+                    height: 48,
+                    semanticsLabel: 'NomNap',
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'nomnap',
+                    style: TextStyle(
+                      fontFamily: '.SF Pro Rounded',
+                      fontFamilyFallback: ['SF Pro Rounded', '.SF Pro Display'],
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1.2,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(44, 44),
+                    onPressed: onAdd,
+                    child: const Icon(
+                      CupertinoIcons.add_circled_solid,
+                      color: AppColors.sleepAccent,
+                      size: 32,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
+
+  @override
+  bool shouldRebuild(covariant _NomNapStickyHeader old) =>
+      old.topInset != topInset || old.onAdd != onAdd;
 }
 
 class _ActionCard extends StatelessWidget {

@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/cupertino.dart';
 
 import '../services/event_store.dart';
@@ -6,50 +8,165 @@ import 'history_screen.dart';
 import 'stats_screen.dart';
 import 'tracker_screen.dart';
 
-class AppShell extends StatelessWidget {
+/// Total vertical space the floating pill nav occupies, including its bottom
+/// gap. Scrollable screens should reserve this much padding at their bottom
+/// so the last item isn't hidden behind the floating nav.
+const double kFloatingNavReserve = 88;
+
+class AppShell extends StatefulWidget {
   final EventStore store;
   const AppShell({super.key, required this.store});
 
   @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  int _index = 0;
+
+  @override
   Widget build(BuildContext context) {
-    return CupertinoTabScaffold(
-      tabBar: CupertinoTabBar(
-        backgroundColor: AppColors.surface.withValues(alpha: 0.92),
-        activeColor: AppColors.sleepAccent,
-        inactiveColor: AppColors.textTertiary,
-        border: const Border(
-          top: BorderSide(color: AppColors.divider, width: 0.5),
-        ),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.circle_grid_3x3),
-            label: 'Track',
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    return CupertinoPageScaffold(
+      backgroundColor: AppColors.background,
+      child: Stack(
+        children: [
+          IndexedStack(
+            index: _index,
+            children: [
+              TrackerScreen(store: widget.store),
+              StatsScreen(store: widget.store),
+              HistoryScreen(store: widget.store),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.chart_bar_alt_fill),
-            label: 'Stats',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.time),
-            label: 'History',
+          Positioned(
+            left: 32,
+            right: 32,
+            bottom: bottomInset + 16,
+            child: _FloatingPillNav(
+              currentIndex: _index,
+              onChanged: (i) => setState(() => _index = i),
+            ),
           ),
         ],
       ),
-      tabBuilder: (context, index) {
-        return CupertinoTabView(
-          builder: (context) {
-            switch (index) {
-              case 0:
-                return TrackerScreen(store: store);
-              case 1:
-                return StatsScreen(store: store);
-              case 2:
-              default:
-                return HistoryScreen(store: store);
-            }
-          },
-        );
-      },
+    );
+  }
+}
+
+class _NavItem {
+  final IconData icon;
+  final String label;
+  const _NavItem(this.icon, this.label);
+}
+
+const List<_NavItem> _kNavItems = [
+  _NavItem(CupertinoIcons.house_fill, 'Track'),
+  _NavItem(CupertinoIcons.chart_bar_alt_fill, 'Stats'),
+  _NavItem(CupertinoIcons.clock_fill, 'History'),
+];
+
+class _FloatingPillNav extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onChanged;
+  const _FloatingPillNav({
+    required this.currentIndex,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            // Slight top-to-bottom gradient gives the "liquid glass"
+            // dimensional feel without looking heavy.
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                CupertinoColors.white.withValues(alpha: 0.88),
+                CupertinoColors.white.withValues(alpha: 0.76),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: CupertinoColors.white.withValues(alpha: 0.55),
+              width: 0.6,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1A1A2E).withValues(alpha: 0.12),
+                blurRadius: 26,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: const Color(0xFF1A1A2E).withValues(alpha: 0.04),
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              for (var i = 0; i < _kNavItems.length; i++)
+                Expanded(
+                  child: _PillNavItem(
+                    item: _kNavItems[i],
+                    active: currentIndex == i,
+                    onTap: () => onChanged(i),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PillNavItem extends StatelessWidget {
+  final _NavItem item;
+  final bool active;
+  final VoidCallback onTap;
+  const _PillNavItem({
+    required this.item,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppColors.sleepAccent : AppColors.textTertiary;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Center(
+        // Stack lets the active circle background sit *behind* the icon
+        // without affecting the icon's resting position when inactive.
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: active ? 40 : 0,
+              height: active ? 40 : 0,
+              decoration: BoxDecoration(
+                color: active
+                    ? AppColors.sleepAccent.withValues(alpha: 0.14)
+                    : CupertinoColors.transparent,
+                shape: BoxShape.circle,
+              ),
+            ),
+            Icon(item.icon, size: 22, color: color),
+          ],
+        ),
+      ),
     );
   }
 }

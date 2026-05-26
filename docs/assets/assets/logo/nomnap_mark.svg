@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="NomNap mark">
+  <defs>
+    <radialGradient id="cheek-m" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FF8A65" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#FF8A65" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Soft round face -->
+  <circle cx="128" cy="140" r="100" fill="#FFD8B5"/>
+
+  <!-- Cheek blush -->
+  <ellipse cx="76" cy="160" rx="22" ry="14" fill="url(#cheek-m)"/>
+  <ellipse cx="180" cy="160" rx="22" ry="14" fill="url(#cheek-m)"/>
+
+  <!-- Sleepy closed eyes -->
+  <path d="M 78 122 q 16 14 32 0" stroke="#2D3142" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <path d="M 146 122 q 16 14 32 0" stroke="#2D3142" stroke-width="9" stroke-linecap="round" fill="none"/>
+
+  <!-- Tiny smile -->
+  <path d="M 112 178 q 16 12 32 0" stroke="#2D3142" stroke-width="8" stroke-linecap="round" fill="none"/>
+
+  <!-- Floating Zz -->
+  <g stroke="#5B6CFF" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <g transform="translate(196 36) rotate(-10)">
+      <path d="M 0 0 L 36 0 L 0 36 L 36 36" stroke-width="9"/>
+    </g>
+    <g transform="translate(228 10) rotate(-10)">
+      <path d="M 0 0 L 18 0 L 0 18 L 18 18" stroke-width="6"/>
+    </g>
+  </g>
+</svg>

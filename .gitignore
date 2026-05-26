@@ -46,3 +46,6 @@ app.*.map.json
 
 # Claude Code local state
 .claude/
+
+# GitHub Pages serves from here — don't ignore even though /build/ is ignored
+!/docs/

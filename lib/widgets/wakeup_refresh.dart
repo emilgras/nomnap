@@ -4,11 +4,13 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 
-/// A purely decorative pull-to-refresh control. Pulling down opens the
-/// sleepy mascot's eyes and floats away the Zzz's; releasing past the
-/// trigger plays a brief "wake up" bounce, then the face drifts back to
-/// sleep as the indicator retracts. It does not refresh any data — the
-/// effect exists only because it's cute.
+/// A purely decorative pull-to-refresh control. The mascot starts wide
+/// awake; pulling lulls it to sleep — eyes drift from round dots to
+/// closed eyelash arcs, the mouth softens from a little open "o" to a
+/// gentle U smile, and two Zzz fade in and float upward. Releasing past
+/// the trigger holds the asleep state briefly, then the indicator
+/// retracts and the face wakes back up. It does not refresh any data —
+/// the effect exists only because it's cute.
 class WakeupRefreshControl extends StatelessWidget {
   const WakeupRefreshControl({super.key});
 
@@ -28,7 +30,7 @@ class WakeupRefreshControl extends StatelessWidget {
         triggerExtent,
         indicatorExtent,
       ) {
-        return _WakingFaceIndicator(
+        return _SleepyFaceIndicator(
           refreshState: state,
           pulledExtent: pulledExtent,
           triggerExtent: triggerExtent,
@@ -39,13 +41,13 @@ class WakeupRefreshControl extends StatelessWidget {
   }
 }
 
-class _WakingFaceIndicator extends StatefulWidget {
+class _SleepyFaceIndicator extends StatefulWidget {
   final RefreshIndicatorMode refreshState;
   final double pulledExtent;
   final double triggerExtent;
   final double indicatorExtent;
 
-  const _WakingFaceIndicator({
+  const _SleepyFaceIndicator({
     required this.refreshState,
     required this.pulledExtent,
     required this.triggerExtent,
@@ -53,21 +55,16 @@ class _WakingFaceIndicator extends StatefulWidget {
   });
 
   @override
-  State<_WakingFaceIndicator> createState() => _WakingFaceIndicatorState();
+  State<_SleepyFaceIndicator> createState() => _SleepyFaceIndicatorState();
 }
 
-class _WakingFaceIndicatorState extends State<_WakingFaceIndicator>
-    with TickerProviderStateMixin {
-  late final AnimationController _wakeCtrl;
+class _SleepyFaceIndicatorState extends State<_SleepyFaceIndicator>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _zCtrl;
 
   @override
   void initState() {
     super.initState();
-    _wakeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 550),
-    );
     _zCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2600),
@@ -75,25 +72,9 @@ class _WakingFaceIndicatorState extends State<_WakingFaceIndicator>
   }
 
   @override
-  void didUpdateWidget(_WakingFaceIndicator oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final entering = widget.refreshState == RefreshIndicatorMode.refresh &&
-        oldWidget.refreshState != RefreshIndicatorMode.refresh;
-    if (entering) {
-      _wakeCtrl.forward(from: 0);
-    }
-  }
-
-  @override
   void dispose() {
-    _wakeCtrl.dispose();
     _zCtrl.dispose();
     super.dispose();
-  }
-
-  double _easeOut(double t) {
-    final c = (1 - t).clamp(0.0, 1.0);
-    return 1 - c * c * c;
   }
 
   @override
@@ -101,40 +82,27 @@ class _WakingFaceIndicatorState extends State<_WakingFaceIndicator>
     final progress = widget.triggerExtent <= 0
         ? 0.0
         : (widget.pulledExtent / widget.triggerExtent).clamp(0.0, 1.0);
-    final dragOpen = _easeOut(progress);
-    final isAwake = widget.refreshState == RefreshIndicatorMode.armed ||
+    final held = widget.refreshState == RefreshIndicatorMode.armed ||
         widget.refreshState == RefreshIndicatorMode.refresh;
+    final sleepiness = held ? 1.0 : progress;
 
     return AnimatedBuilder(
-      animation: Listenable.merge([_wakeCtrl, _zCtrl]),
+      animation: _zCtrl,
       builder: (ctx, _) {
-        final wake = _wakeCtrl.value;
-        final wakePulse = math.sin(wake * math.pi).clamp(0.0, 1.0);
-        final bounce = isAwake ? 1 + wakePulse * 0.09 : 1.0;
-        final eyeOpen = isAwake ? 1.0 : dragOpen;
-        final smileExtra = isAwake ? wakePulse : 0.0;
-        final zVisibility = (1 - dragOpen).clamp(0.0, 1.0) *
-            (isAwake ? 0.0 : 1.0);
-
         return Center(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             child: SizedBox(
-              height: widget.indicatorExtent - 8,
+              height: widget.indicatorExtent - 12,
               child: FittedBox(
                 fit: BoxFit.contain,
                 child: SizedBox(
                   width: 256,
                   height: 256,
-                  child: Transform.scale(
-                    scale: bounce,
-                    child: CustomPaint(
-                      painter: _FacePainter(
-                        eyeOpen: eyeOpen,
-                        zPhase: _zCtrl.value,
-                        zVisibility: zVisibility,
-                        smileExtra: smileExtra,
-                      ),
+                  child: CustomPaint(
+                    painter: _FacePainter(
+                      sleepiness: sleepiness,
+                      zPhase: _zCtrl.value,
                     ),
                   ),
                 ),
@@ -148,24 +116,27 @@ class _WakingFaceIndicatorState extends State<_WakingFaceIndicator>
 }
 
 class _FacePainter extends CustomPainter {
-  final double eyeOpen;
+  final double sleepiness;
   final double zPhase;
-  final double zVisibility;
-  final double smileExtra;
 
-  _FacePainter({
-    required this.eyeOpen,
-    required this.zPhase,
-    required this.zVisibility,
-    required this.smileExtra,
-  });
+  _FacePainter({required this.sleepiness, required this.zPhase});
 
   static const _faceColor = Color(0xFFFFD8B5);
   static const _cheekColor = Color(0xFFFF8A65);
   static const _strokeColor = Color(0xFF2D3142);
 
+  // Smoothstep eases the swap of features through the mid-point so neither
+  // form lingers half-strength, which would otherwise look like a double
+  // mouth/eye smear during the crossfade.
+  static double _smooth(double t) {
+    final c = t.clamp(0.0, 1.0);
+    return c * c * (3 - 2 * c);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 256.0);
+
     canvas.drawCircle(
       const Offset(128, 128),
       116,
@@ -178,9 +149,9 @@ class _FacePainter extends CustomPainter {
     _drawEye(canvas, const Offset(88, 112));
     _drawEye(canvas, const Offset(168, 112));
 
-    _drawSmile(canvas);
+    _drawMouth(canvas);
 
-    if (zVisibility > 0.01) {
+    if (sleepiness > 0.02) {
       _drawZs(canvas);
     }
   }
@@ -198,10 +169,12 @@ class _FacePainter extends CustomPainter {
   }
 
   void _drawEye(Canvas canvas, Offset c) {
-    final closedOpacity = (1 - eyeOpen).clamp(0.0, 1.0);
-    if (closedOpacity > 0.01) {
+    final asleep = _smooth(sleepiness);
+    final awake = 1 - asleep;
+
+    if (asleep > 0.01) {
       final stroke = Paint()
-        ..color = _strokeColor.withValues(alpha: closedOpacity)
+        ..color = _strokeColor.withValues(alpha: asleep)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 10
         ..strokeCap = StrokeCap.round;
@@ -211,34 +184,49 @@ class _FacePainter extends CustomPainter {
       canvas.drawPath(path, stroke);
     }
 
-    final openOpacity = eyeOpen.clamp(0.0, 1.0);
-    if (openOpacity > 0.01) {
-      final r = 9 * openOpacity;
-      final fill = Paint()
-        ..color = _strokeColor.withValues(alpha: openOpacity);
-      canvas.drawCircle(c, r, fill);
-      if (openOpacity > 0.6) {
-        final highlightAlpha = ((openOpacity - 0.6) / 0.4).clamp(0.0, 1.0);
-        final highlight = Paint()
-          ..color = CupertinoColors.white.withValues(alpha: highlightAlpha);
-        canvas.drawCircle(c + const Offset(-2.6, -2.8), 2.4, highlight);
+    if (awake > 0.01) {
+      // Open eyes start full-size; pupil shrinks as they close.
+      final r = 9 * awake;
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()..color = _strokeColor.withValues(alpha: awake),
+      );
+      if (awake > 0.55) {
+        final h = ((awake - 0.55) / 0.45).clamp(0.0, 1.0);
+        canvas.drawCircle(
+          c + const Offset(-2.6, -2.8),
+          2.4,
+          Paint()..color = CupertinoColors.white.withValues(alpha: h),
+        );
       }
     }
   }
 
-  void _drawSmile(Canvas canvas) {
-    final stroke = Paint()
-      ..color = _strokeColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 9
-      ..strokeCap = StrokeCap.round;
-    final widen = 1 + smileExtra * 0.18;
-    final w = 18 * widen;
-    final dy = 14 * (1 + smileExtra * 0.45);
-    final path = Path()
-      ..moveTo(128 - w, 172)
-      ..quadraticBezierTo(128, 172 + dy, 128 + w, 172);
-    canvas.drawPath(path, stroke);
+  void _drawMouth(Canvas canvas) {
+    final asleep = _smooth(sleepiness);
+    final awake = 1 - asleep;
+
+    if (asleep > 0.01) {
+      final stroke = Paint()
+        ..color = _strokeColor.withValues(alpha: asleep)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 9
+        ..strokeCap = StrokeCap.round;
+      final path = Path()
+        ..moveTo(110, 172)
+        ..quadraticBezierTo(128, 186, 146, 172);
+      canvas.drawPath(path, stroke);
+    }
+
+    if (awake > 0.01) {
+      final fill = Paint()
+        ..color = _strokeColor.withValues(alpha: awake);
+      canvas.drawOval(
+        Rect.fromCenter(center: const Offset(128, 176), width: 16, height: 11),
+        fill,
+      );
+    }
   }
 
   void _drawZs(Canvas canvas) {
@@ -250,11 +238,10 @@ class _FacePainter extends CustomPainter {
       required double phaseOffset,
     }) {
       final p = (zPhase + phaseOffset) % 1.0;
+      final rise = p * 14;
       final bob = math.sin(p * math.pi * 2) * 2.5;
-      final rise = p * 10;
-      // Gentle in/out so the Zs don't pop at the wrap.
-      final fade = (math.sin(p * math.pi)).clamp(0.0, 1.0);
-      final alpha = (zVisibility * (0.55 + 0.45 * fade)).clamp(0.0, 1.0);
+      final lifecycle = math.sin(p * math.pi).clamp(0.0, 1.0);
+      final alpha = (sleepiness * (0.35 + 0.65 * lifecycle)).clamp(0.0, 1.0);
       final paint = Paint()
         ..color = AppColors.sleepAccent.withValues(alpha: alpha)
         ..style = PaintingStyle.stroke
@@ -279,8 +266,5 @@ class _FacePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_FacePainter old) =>
-      old.eyeOpen != eyeOpen ||
-      old.zPhase != zPhase ||
-      old.zVisibility != zVisibility ||
-      old.smileExtra != smileExtra;
+      old.sleepiness != sleepiness || old.zPhase != zPhase;
 }

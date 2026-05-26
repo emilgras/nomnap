@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NomNap — logo preview</title>
+<style>
+  :root {
+    --bg: #F7F7F8;
+    --surface: #FFFFFF;
+    --text: #111114;
+    --muted: #6E6E73;
+    --border: #E5E5EA;
+    --indigo: #5B6CFF;
+    --coral: #FF8A65;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    padding: 48px 32px 96px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 28px; letter-spacing: -0.4px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 40px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 40px 0 16px; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .card .label { font-size: 12px; color: var(--muted); }
+
+  /* iOS-style squircle mask, the same rounding the App Store applies */
+  .squircle { border-radius: 22.37%; overflow: hidden; box-shadow: 0 8px 28px rgba(0,0,0,0.08); }
+  .squircle img { display: block; }
+
+  /* Simulated iOS home screen tile sizes */
+  .ios-180 { width: 180px; height: 180px; }
+  .ios-120 { width: 120px; height: 120px; }
+  .ios-60  { width: 60px;  height: 60px;  }
+  .ios-40  { width: 40px;  height: 40px;  }
+
+  /* Home-screen mock */
+  .home-mock {
+    background: linear-gradient(160deg, #6BB7E8 0%, #FCB47A 100%);
+    border-radius: 32px;
+    padding: 28px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 22px 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    max-width: 380px;
+  }
+  .home-mock .tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: white;
+    font-size: 11px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .home-mock .placeholder {
+    width: 60px; height: 60px;
+    border-radius: 22.37%;
+    background: rgba(255,255,255,0.25);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Wordmark display */
+  .wordmark-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; }
+  .wordmark-wrap.dark { background: #2D3142; }
+  .wordmark-wrap img { max-width: 100%; height: auto; }
+
+  /* Splash mock */
+  .splash {
+    width: 280px;
+    height: 560px;
+    border-radius: 40px;
+    background: linear-gradient(180deg, #FFE4C2 0%, #FFCBA0 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    border: 8px solid #1a1a1a;
+  }
+  .splash img { width: 60%; }
+  .splash .tagline { margin-top: 24px; color: #2D3142; font-weight: 600; opacity: 0.7; }
+</style>
+</head>
+<body>
+  <h1>NomNap — logo preview</h1>
+  <p class="sub">A sleepy little face with a Zz. Indigo for sleep, coral for the cheeks (feed). Open this file in your browser.</p>
+
+  <h2>App icon — sized like the home screen</h2>
+  <div class="row">
+    <div class="card">
+      <div class="squircle ios-180"><img src="nomnap_icon.svg" width="180" height="180" alt="180px"></div>
+      <div class="label">180×180 · iPhone home</div>
+    </div>
+    <div class="card">
+      <div class="squircle ios-120"><img src="nomnap_icon.svg" width="120" height="120" alt="120px"></div>
+      <div class="label">120×120 · iPhone spotlight</div>
+    </div>
+    <div class="card">
+      <div class="squircle ios-60"><img src="nomnap_icon.svg" width="60" height="60" alt="60px"></div>
+      <div class="label">60×60 · iPad notif</div>
+    </div>
+    <div class="card">
+      <div class="squircle ios-40"><img src="nomnap_icon.svg" width="40" height="40" alt="40px"></div>
+      <div class="label">40×40 · settings</div>
+    </div>
+  </div>
+
+  <h2>On a fake home screen</h2>
+  <div class="home-mock">
+    <div class="tile"><div class="placeholder"></div>Photos</div>
+    <div class="tile"><div class="squircle ios-60"><img src="nomnap_icon.svg" width="60" height="60" alt="NomNap"></div>NomNap</div>
+    <div class="tile"><div class="placeholder"></div>Notes</div>
+    <div class="tile"><div class="placeholder"></div>Maps</div>
+    <div class="tile"><div class="placeholder"></div>Mail</div>
+    <div class="tile"><div class="placeholder"></div>Music</div>
+    <div class="tile"><div class="placeholder"></div>Health</div>
+    <div class="tile"><div class="placeholder"></div>Wallet</div>
+  </div>
+
+  <h2>The mark on its own (transparent background)</h2>
+  <div class="row">
+    <div class="card" style="background:#FFF8EF"><img src="nomnap_mark.svg" width="220" height="220" alt="mark"><div class="label">on cream</div></div>
+    <div class="card" style="background:#2D3142"><img src="nomnap_mark.svg" width="220" height="220" alt="mark"><div class="label" style="color:#aaa">on dark</div></div>
+    <div class="card"><img src="nomnap_mark.svg" width="220" height="220" alt="mark"><div class="label">on white</div></div>
+  </div>
+
+  <h2>Wordmark</h2>
+  <div class="wordmark-wrap">
+    <img src="nomnap_wordmark.svg" alt="nomnap wordmark">
+  </div>
+
+  <h2>Splash screen mock</h2>
+  <div class="splash">
+    <img src="nomnap_mark.svg" alt="splash">
+    <div class="tagline">sleep · feed · vibes</div>
+  </div>
+</body>
+</html>

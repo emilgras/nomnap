@@ -1,11 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 
-import '../models/baby_event.dart';
+import '../models/baby_session.dart';
 import '../services/event_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
+import 'tracker_screen.dart' show SessionRow;
 
 class HistoryScreen extends StatefulWidget {
   final EventStore store;
@@ -30,11 +31,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   void _onChange() => setState(() {});
 
-  Map<DateTime, List<BabyEvent>> _groupByDay(List<BabyEvent> events) {
-    final map = <DateTime, List<BabyEvent>>{};
-    for (final e in events) {
-      final k = DateTime(e.timestamp.year, e.timestamp.month, e.timestamp.day);
-      map.putIfAbsent(k, () => []).add(e);
+  Map<DateTime, List<BabySession>> _groupByDay(List<BabySession> sessions) {
+    final map = <DateTime, List<BabySession>>{};
+    for (final s in sessions) {
+      final k = DateTime(s.start.year, s.start.month, s.start.day);
+      map.putIfAbsent(k, () => []).add(s);
     }
     return map;
   }
@@ -65,9 +66,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Future<void> _editEvent(BabyEvent event) async {
-    DateTime selected = event.timestamp;
-    final action = await showCupertinoModalPopup<_EditAction>(
+  Future<DateTime?> _pickTime({
+    required String title,
+    required DateTime initial,
+    DateTime? min,
+    DateTime? max,
+  }) async {
+    DateTime working = initial;
+    final saved = await showCupertinoModalPopup<bool>(
       context: context,
       builder: (ctx) {
         return Container(
@@ -83,18 +89,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     children: [
                       CupertinoButton(
                         padding: EdgeInsets.zero,
-                        onPressed: () =>
-                            Navigator.pop(ctx, _EditAction.cancel),
+                        onPressed: () => Navigator.pop(ctx, false),
                         child: const Text('Cancel'),
                       ),
                       Expanded(
                         child: Center(
-                          child: Text('Edit time', style: AppText.headline),
+                          child: Text(title, style: AppText.headline),
                         ),
                       ),
                       CupertinoButton(
                         padding: EdgeInsets.zero,
-                        onPressed: () => Navigator.pop(ctx, _EditAction.save),
+                        onPressed: () => Navigator.pop(ctx, true),
                         child: Text(
                           'Save',
                           style: AppText.headline.copyWith(
@@ -108,10 +113,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Expanded(
                   child: CupertinoDatePicker(
                     mode: CupertinoDatePickerMode.dateAndTime,
-                    initialDateTime: event.timestamp,
-                    maximumDate: DateTime.now().add(const Duration(minutes: 1)),
+                    initialDateTime: initial,
+                    minimumDate: min,
+                    maximumDate:
+                        max ?? DateTime.now().add(const Duration(minutes: 1)),
                     use24hFormat: true,
-                    onDateTimeChanged: (v) => selected = v,
+                    onDateTimeChanged: (v) => working = v,
                   ),
                 ),
               ],
@@ -120,16 +127,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
         );
       },
     );
-    if (action == _EditAction.save) {
-      await widget.store.update(event.id, selected);
+    if (saved == true) return working;
+    return null;
+  }
+
+  Future<void> _editStart(BabySession session) async {
+    final picked = await _pickTime(
+      title: 'Edit start',
+      initial: session.start,
+      max: session.end ?? DateTime.now(),
+    );
+    if (picked != null) {
+      await widget.store.editSession(session, newStart: picked);
     }
   }
 
-  Future<void> _confirmDelete(BabyEvent event) async {
+  Future<void> _editEnd(BabySession session) async {
+    if (session.endEventId == null) return;
+    final picked = await _pickTime(
+      title: 'Edit end',
+      initial: session.end!,
+      min: session.start,
+    );
+    if (picked != null) {
+      await widget.store.editSession(session, newEnd: picked);
+    }
+  }
+
+  Future<void> _endNow(BabySession session) async {
+    await widget.store.endOngoingSession(session);
+  }
+
+  Future<void> _confirmDelete(BabySession session) async {
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Delete entry?'),
+        title: const Text('Delete this session?'),
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(ctx, false),
@@ -144,32 +177,50 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
     );
     if (confirmed == true) {
-      await widget.store.remove(event.id);
+      await widget.store.deleteSession(session);
     }
   }
 
-  void _openRowMenu(BabyEvent event) {
+  void _openRowMenu(BabySession session) {
+    final kindLabel =
+        session.kind == SessionKind.sleep ? 'Sleep' : 'Feed';
     showCupertinoModalPopup(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
         title: Text(
-          DateFormat('EEE, MMM d  HH:mm').format(event.timestamp),
+          '$kindLabel · ${DateFormat('EEE, MMM d').format(session.start)}',
         ),
         actions: [
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(ctx);
-              _editEvent(event);
+              _editStart(session);
             },
-            child: const Text('Edit time'),
+            child: const Text('Edit start time'),
           ),
+          if (session.endEventId != null)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _editEnd(session);
+              },
+              child: const Text('Edit end time'),
+            ),
+          if (session.isOngoing)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _endNow(session);
+              },
+              child: const Text('End now'),
+            ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             onPressed: () {
               Navigator.pop(ctx);
-              _confirmDelete(event);
+              _confirmDelete(session);
             },
-            child: const Text('Delete'),
+            child: const Text('Delete session'),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -182,8 +233,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final events = widget.store.events.reversed.toList();
-    final grouped = _groupByDay(events);
+    final sessions = widget.store.sessions.reversed.toList();
+    final grouped = _groupByDay(sessions);
     final days = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return CupertinoPageScaffold(
@@ -198,7 +249,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               preferredSize: Size.fromHeight(10),
               child: SizedBox.shrink(),
             ),
-            trailing: events.isEmpty
+            trailing: sessions.isEmpty
                 ? null
                 : CupertinoButton(
                     padding: EdgeInsets.zero,
@@ -210,14 +261,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                   ),
           ),
-          if (events.isEmpty)
+          if (sessions.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Center(
                   child: Text(
-                    'Your tracked events will appear here.',
+                    'Your tracked sessions will appear here.',
                     textAlign: TextAlign.center,
                     style: AppText.subhead,
                   ),
@@ -236,7 +287,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, idx) {
                     final day = days[idx];
-                    final dayEvents = grouped[day]!;
+                    final daySessions = grouped[day]!;
                     return Padding(
                       padding: EdgeInsets.only(top: idx == 0 ? 0 : 22),
                       child: Column(
@@ -247,12 +298,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             padding: EdgeInsets.zero,
                             child: Column(
                               children: [
-                                for (var i = 0; i < dayEvents.length; i++) ...[
-                                  _HistoryRow(
-                                    event: dayEvents[i],
-                                    onTap: () => _openRowMenu(dayEvents[i]),
+                                for (var i = 0; i < daySessions.length; i++) ...[
+                                  SessionRow(
+                                    session: daySessions[i],
+                                    onTap: () => _openRowMenu(daySessions[i]),
                                   ),
-                                  if (i < dayEvents.length - 1)
+                                  if (i < daySessions.length - 1)
                                     Container(
                                       margin: const EdgeInsets.only(left: 60),
                                       height: 0.5,
@@ -271,74 +322,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-enum _EditAction { cancel, save }
-
-class _HistoryRow extends StatelessWidget {
-  final BabyEvent event;
-  final VoidCallback onTap;
-  const _HistoryRow({required this.event, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isSleep = event.type == EventType.sleepStart ||
-        event.type == EventType.sleepEnd;
-    final accent = isSleep ? AppColors.sleepAccent : AppColors.feedAccent;
-    final softBg = isSleep ? AppColors.sleepSoft : AppColors.feedSoft;
-    final icon = isSleep ? CupertinoIcons.moon_fill : CupertinoIcons.drop_fill;
-    String label;
-    switch (event.type) {
-      case EventType.sleepStart:
-        label = 'Sleep started';
-        break;
-      case EventType.sleepEnd:
-        label = 'Sleep ended';
-        break;
-      case EventType.feedStart:
-        label = 'Feed started';
-        break;
-      case EventType.feedEnd:
-        label = 'Feed ended';
-        break;
-    }
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: softBg,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Icon(icon, color: accent, size: 16),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(label, style: AppText.callout),
-            ),
-            Text(
-              formatClock(event.timestamp),
-              style: AppText.subhead.copyWith(
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            const SizedBox(width: 6),
-            const Icon(
-              CupertinoIcons.chevron_right,
-              size: 14,
-              color: AppColors.textTertiary,
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -10,17 +10,17 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final store = EventStore();
   await store.load();
-  runApp(BabyTrackApp(store: store));
+  runApp(NomNapApp(store: store));
 }
 
-class BabyTrackApp extends StatelessWidget {
+class NomNapApp extends StatelessWidget {
   final EventStore store;
-  const BabyTrackApp({super.key, required this.store});
+  const NomNapApp({super.key, required this.store});
 
   @override
   Widget build(BuildContext context) {
     return CupertinoApp(
-      title: 'BabyTrack',
+      title: 'NomNap',
       debugShowCheckedModeBanner: false,
       theme: const CupertinoThemeData(
         brightness: Brightness.light,

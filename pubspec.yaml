@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.5.5
   intl: ^0.20.2
+  flutter_svg: ^2.0.10
 
 dev_dependencies:
   flutter_test:
@@ -47,6 +48,20 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  image_path: "assets/logo/nomnap_icon_1024.png"
+  android: "ic_launcher"
+  ios: true
+  remove_alpha_ios: true
+  adaptive_icon_background: "#FFCBA0"
+  adaptive_icon_foreground: "assets/logo/nomnap_adaptive_fg_1024.png"
+  web:
+    generate: true
+    image_path: "assets/logo/nomnap_icon_1024.png"
+    background_color: "#FFCBA0"
+    theme_color: "#FFCBA0"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -58,6 +73,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/logo/nomnap_mark.svg
+    - assets/logo/nomnap_wordmark.svg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

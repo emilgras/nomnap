@@ -1,11 +1,11 @@
 {
-    "name": "BabyTrack",
-    "short_name": "BabyTrack",
+    "name": "NomNap",
+    "short_name": "NomNap",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#ffffff",
-    "description": "A simple, elegant baby sleep & feed tracker.",
+    "background_color": "#FFCBA0",
+    "theme_color": "#FFCBA0",
+    "description": "NomNap — a cozy sleep & feed tracker for tiny humans.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,6 +1,8 @@
-# BabyTrack
+# NomNap
 
-A minimal, iOS-elegant baby tracker. Four actions: **start sleep**, **end sleep**, **start feed**, **end feed**. The app handles all the timing math. Everything is stored locally on the device — no account, no backend.
+A cozy, iOS-elegant baby tracker. Four actions: **start sleep**, **end sleep**, **start feed**, **end feed**. The app handles all the timing math. Everything is stored locally on the device — no account, no backend.
+
+> Logo and brand assets live in [assets/logo/](assets/logo/). Open [assets/logo/preview.html](assets/logo/preview.html) in a browser to see the icon, mark, wordmark, and a fake home-screen.
 
 Built with **Flutter** so a single codebase ships native binaries for both Google Play and the Apple App Store.
 
@@ -69,7 +71,7 @@ The code is ready. You just need the Android toolchain locally.
    ```
    Output: `build/app/outputs/bundle/release/app-release.aab` — upload this to the Play Console.
 
-Bundle ID is `com.babytrack.babytrack`. Change it in `android/app/build.gradle.kts` (`applicationId`) if you want a different one before your first Play submission.
+Bundle ID is currently `com.babytrack.babytrack` (the project's original internal name; only Dart code and bundle ids still carry it — user-facing branding is NomNap). Change it in `android/app/build.gradle.kts` (`applicationId`) before your first Play submission if you want a `com.nomnap.*` identifier.
 
 ## Shipping to the App Store (iOS)
 
@@ -82,4 +84,4 @@ You'll need an Apple Developer account ($99/year) and to set up an App ID + prov
 
 ## Storage notes
 
-Events are persisted as JSON in `SharedPreferences` under the key `babytrack.events.v1`. On Android this is backed by `SharedPreferences` (cleared if the user clears app data); on iOS it's `NSUserDefaults`. If you ever want cloud sync later, the `EventStore` is the only file that needs to change.
+Events are persisted as JSON in `SharedPreferences` under the key `babytrack.events.v1` (key intentionally kept stable across the BabyTrack → NomNap rename so existing installs don't lose data). On Android this is backed by `SharedPreferences` (cleared if the user clears app data); on iOS it's `NSUserDefaults`. If you ever want cloud sync later, the `EventStore` is the only file that needs to change.

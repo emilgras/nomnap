@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../models/baby_event.dart';
+import '../models/baby_session.dart';
 import '../services/event_store.dart';
 import '../services/statistics.dart';
 import '../theme/app_theme.dart';
@@ -42,28 +43,16 @@ class _TrackerScreenState extends State<TrackerScreen> {
   void _onStoreChanged() => setState(() {});
 
   Future<void> _toggleSleep() async {
-    debugPrint('[tracker] _toggleSleep tap, isSleeping=${widget.store.isSleeping}');
-    try {
-      final type =
-          widget.store.isSleeping ? EventType.sleepEnd : EventType.sleepStart;
-      await widget.store.add(type);
-      debugPrint('[tracker] sleep event saved, total=${widget.store.events.length}');
-    } catch (e, st) {
-      debugPrint('[tracker] sleep toggle FAILED: $e\n$st');
-    }
+    final type =
+        widget.store.isSleeping ? EventType.sleepEnd : EventType.sleepStart;
+    await widget.store.add(type);
     unawaited(HapticFeedback.mediumImpact());
   }
 
   Future<void> _toggleFeed() async {
-    debugPrint('[tracker] _toggleFeed tap, isFeeding=${widget.store.isFeeding}');
-    try {
-      final type =
-          widget.store.isFeeding ? EventType.feedEnd : EventType.feedStart;
-      await widget.store.add(type);
-      debugPrint('[tracker] feed event saved, total=${widget.store.events.length}');
-    } catch (e, st) {
-      debugPrint('[tracker] feed toggle FAILED: $e\n$st');
-    }
+    final type =
+        widget.store.isFeeding ? EventType.feedEnd : EventType.feedStart;
+    await widget.store.add(type);
     unawaited(HapticFeedback.mediumImpact());
   }
 
@@ -81,7 +70,11 @@ class _TrackerScreenState extends State<TrackerScreen> {
       child: CustomScrollView(
         slivers: [
           CupertinoSliverNavigationBar(
-            largeTitle: const Text('BabyTrack'),
+            largeTitle: SvgPicture.asset(
+              'assets/logo/nomnap_wordmark.svg',
+              height: 38,
+              semanticsLabel: 'NomNap',
+            ),
             backgroundColor: AppColors.background,
             border: null,
             bottom: const PreferredSize(
@@ -142,7 +135,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
                 _TodaySummary(daily: today),
                 const SizedBox(height: 28),
                 const SectionHeader('Recent activity'),
-                _RecentActivity(events: store.events),
+                _RecentActivity(sessions: store.sessions),
               ]),
             ),
           ),
@@ -430,12 +423,12 @@ class _CellDivider extends StatelessWidget {
 }
 
 class _RecentActivity extends StatelessWidget {
-  final List<BabyEvent> events;
-  const _RecentActivity({required this.events});
+  final List<BabySession> sessions;
+  const _RecentActivity({required this.sessions});
 
   @override
   Widget build(BuildContext context) {
-    final recent = events.reversed.take(5).toList();
+    final recent = sessions.reversed.take(5).toList();
     if (recent.isEmpty) {
       return SectionCard(
         child: Center(
@@ -454,7 +447,7 @@ class _RecentActivity extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < recent.length; i++) ...[
-            _ActivityRow(event: recent[i]),
+            SessionRow(session: recent[i]),
             if (i < recent.length - 1)
               Container(
                 margin: const EdgeInsets.only(left: 60),
@@ -468,35 +461,34 @@ class _RecentActivity extends StatelessWidget {
   }
 }
 
-class _ActivityRow extends StatelessWidget {
-  final BabyEvent event;
-  const _ActivityRow({required this.event});
+/// One row representing a sleep or feed session.
+/// Shows kind, duration (or "ongoing" with a pulsing dot), and time range.
+class SessionRow extends StatelessWidget {
+  final BabySession session;
+  final VoidCallback? onTap;
+  const SessionRow({super.key, required this.session, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final isSleep = event.type == EventType.sleepStart ||
-        event.type == EventType.sleepEnd;
+    final isSleep = session.kind == SessionKind.sleep;
     final accent = isSleep ? AppColors.sleepAccent : AppColors.feedAccent;
     final softBg = isSleep ? AppColors.sleepSoft : AppColors.feedSoft;
     final icon = isSleep ? CupertinoIcons.moon_fill : CupertinoIcons.drop_fill;
 
-    String label;
-    switch (event.type) {
-      case EventType.sleepStart:
-        label = 'Sleep started';
-        break;
-      case EventType.sleepEnd:
-        label = 'Sleep ended';
-        break;
-      case EventType.feedStart:
-        label = 'Feed started';
-        break;
-      case EventType.feedEnd:
-        label = 'Feed ended';
-        break;
-    }
+    final ongoing = session.isOngoing;
+    final title = ongoing
+        ? (isSleep ? 'Sleeping' : 'Feeding')
+        : (isSleep ? 'Slept' : 'Fed');
 
-    return Padding(
+    final duration = ongoing
+        ? DateTime.now().difference(session.start)
+        : session.duration!;
+
+    final rightText = ongoing
+        ? 'Since ${formatClock(session.start)}'
+        : '${formatClock(session.start)} – ${formatClock(session.end!)}';
+
+    final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
@@ -514,15 +506,57 @@ class _ActivityRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: AppText.callout),
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: AppText.callout.copyWith(
+                        color: ongoing ? accent : AppColors.textPrimary,
+                        fontWeight:
+                            ongoing ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                    if (ongoing) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 2),
-                Text(relativeTimeAgo(event.timestamp), style: AppText.footnote),
+                Text(formatDuration(duration), style: AppText.footnote),
               ],
             ),
           ),
-          Text(formatClock(event.timestamp), style: AppText.subhead),
+          Text(
+            rightText,
+            style: AppText.subhead.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          if (onTap != null) ...[
+            const SizedBox(width: 6),
+            const Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: AppColors.textTertiary,
+            ),
+          ],
         ],
       ),
+    );
+
+    if (onTap == null) return content;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: onTap,
+      child: content,
     );
   }
 }

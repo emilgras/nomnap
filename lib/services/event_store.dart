@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/baby_event.dart';
+import '../models/baby_session.dart';
 
 class EventStore extends ChangeNotifier {
   static const _storageKey = 'babytrack.events.v1';
@@ -132,4 +133,38 @@ class EventStore extends ChangeNotifier {
 
   DateTime? get feedStartedAt =>
       isFeeding ? lastOf(EventType.feedStart)?.timestamp : null;
+
+  /// All sessions (start/end pairs) derived from the event stream,
+  /// in chronological order. Ongoing sessions have a null end.
+  List<BabySession> get sessions => BabySession.from(_events);
+
+  Future<void> deleteSession(BabySession session) async {
+    _events.removeWhere(
+      (e) => e.id == session.startEventId || e.id == session.endEventId,
+    );
+    notifyListeners();
+    await _persist();
+  }
+
+  /// Update either the start or the end of a session in place.
+  /// `start` and `end` are new values; pass null to leave that side unchanged.
+  /// `end` may be null only if the session is already ongoing.
+  Future<void> editSession(
+    BabySession session, {
+    DateTime? newStart,
+    DateTime? newEnd,
+  }) async {
+    if (newStart != null) {
+      await update(session.startEventId, newStart);
+    }
+    if (newEnd != null && session.endEventId != null) {
+      await update(session.endEventId!, newEnd);
+    }
+  }
+
+  /// Append an end event to an ongoing session at the given time (defaults to now).
+  Future<void> endOngoingSession(BabySession session, {DateTime? at}) async {
+    if (!session.isOngoing) return;
+    await add(session.kind.endType, at: at);
+  }
 }

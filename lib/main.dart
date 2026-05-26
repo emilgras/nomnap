@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import 'screens/app_shell.dart';
 import 'services/event_store.dart';
+import 'services/persistent_storage.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -10,6 +13,7 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final store = EventStore();
   await store.load();
+  unawaited(requestPersistentStorage());
   runApp(NomNapApp(store: store));
 }
 

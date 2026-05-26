@@ -30,6 +30,7 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
   late _Kind _kind;
   late DateTime _start;
   late DateTime _end;
+  bool _ongoing = false;
   bool _saving = false;
   String? _error;
 
@@ -56,10 +57,26 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
     return _Kind.sleep;
   }
 
+  bool get _kindAlreadyOngoing => _kind == _Kind.sleep
+      ? widget.store.isSleeping
+      : widget.store.isFeeding;
+
   Future<void> _save() async {
-    if (!_end.isAfter(_start)) {
-      setState(() => _error = 'End must be after start.');
-      return;
+    if (_ongoing) {
+      if (_kindAlreadyOngoing) {
+        setState(() => _error =
+            'A ${_kind == _Kind.sleep ? 'sleep' : 'feed'} is already in progress.');
+        return;
+      }
+      if (_start.isAfter(DateTime.now())) {
+        setState(() => _error = "Start can't be in the future.");
+        return;
+      }
+    } else {
+      if (!_end.isAfter(_start)) {
+        setState(() => _error = 'End must be after start.');
+        return;
+      }
     }
     setState(() {
       _saving = true;
@@ -69,14 +86,18 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
     final startType = _kind == _Kind.sleep
         ? EventType.sleepStart
         : EventType.feedStart;
-    final endType =
-        _kind == _Kind.sleep ? EventType.sleepEnd : EventType.feedEnd;
-    await widget.store.addSession(
-      startType: startType,
-      endType: endType,
-      start: _start,
-      end: _end,
-    );
+    if (_ongoing) {
+      await widget.store.add(startType, at: _start);
+    } else {
+      final endType =
+          _kind == _Kind.sleep ? EventType.sleepEnd : EventType.feedEnd;
+      await widget.store.addSession(
+        startType: startType,
+        endType: endType,
+        start: _start,
+        end: _end,
+      );
+    }
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -234,22 +255,35 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
                   ),
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              _OngoingRow(
+                value: _ongoing,
+                accent: accent,
+                onChanged: (v) => setState(() {
+                  _ongoing = v;
+                  _error = null;
+                }),
+              ),
+              const SizedBox(height: 10),
               _TimeRow(
                 label: 'Started',
                 value: _formatStamp(_start),
                 onTap: () => _pickTime(isStart: true),
               ),
-              const SizedBox(height: 10),
-              _TimeRow(
-                label: 'Ended',
-                value: _formatStamp(_end),
-                onTap: () => _pickTime(isStart: false),
-              ),
+              if (!_ongoing) ...[
+                const SizedBox(height: 10),
+                _TimeRow(
+                  label: 'Ended',
+                  value: _formatStamp(_end),
+                  onTap: () => _pickTime(isStart: false),
+                ),
+              ],
               const SizedBox(height: 18),
               Center(
                 child: Text(
-                  'Duration  ${formatDuration(duration)}',
+                  _ongoing
+                      ? 'In progress'
+                      : 'Duration  ${formatDuration(duration)}',
                   style: AppText.subhead.copyWith(
                     color: accent,
                     fontWeight: FontWeight.w500,
@@ -320,6 +354,39 @@ class _SegmentLabel extends StatelessWidget {
               color: selected ? AppColors.textPrimary : AppColors.textSecondary,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OngoingRow extends StatelessWidget {
+  final bool value;
+  final Color accent;
+  final ValueChanged<bool> onChanged;
+  const _OngoingRow({
+    required this.value,
+    required this.accent,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Row(
+        children: [
+          Text('Still in progress', style: AppText.callout),
+          const Spacer(),
+          CupertinoSwitch(
+            value: value,
+            activeTrackColor: accent,
+            onChanged: onChanged,
           ),
         ],
       ),

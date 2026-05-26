@@ -11,7 +11,7 @@ import 'tracker_screen.dart';
 /// Total vertical space the floating pill nav occupies, including its bottom
 /// gap. Scrollable screens should reserve this much padding at their bottom
 /// so the last item isn't hidden behind the floating nav.
-const double kFloatingNavReserve = 86;
+const double kFloatingNavReserve = 140;
 
 class AppShell extends StatefulWidget {
   final EventStore store;
@@ -65,15 +65,15 @@ class _AppShellState extends State<AppShell> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: bottomInset + 16,
+            bottom: bottomInset + 28,
             // Center + ConstrainedBox: keeps the nav at a phone-friendly
             // width even on tablet/desktop sizes (doesn't grow with screen).
             // Side padding still gives breathing room on small screens.
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 380),
+                constraints: const BoxConstraints(maxWidth: 340),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: _FloatingPillNav(
                     currentIndex: _index,
                     onChanged: (i) => setState(() => _index = i),
@@ -148,18 +148,46 @@ class _FloatingPillNav extends StatelessWidget {
             // Uniform 4px inset on all sides ⇒ leftmost/rightmost active pill
             // curves are perfectly concentric with the outer container.
             padding: const EdgeInsets.all(_innerInset),
-            child: Row(
-              children: [
-                for (var i = 0; i < _kNavItems.length; i++)
-                  Expanded(
-                    child: _PillNavItem(
-                      item: _kNavItems[i],
-                      active: currentIndex == i,
-                      onTap: () => onChanged(i),
-                      radius: _innerRadius,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final slotWidth =
+                    constraints.maxWidth / _kNavItems.length;
+                return Stack(
+                  children: [
+                    // Single sliding indicator — glides between slots so the
+                    // selection feels like one liquid pill, not three discrete
+                    // backgrounds flickering on/off.
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 320),
+                      curve: Curves.easeOutCubic,
+                      left: currentIndex * slotWidth,
+                      top: 0,
+                      bottom: 0,
+                      width: slotWidth,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.sleepAccent
+                              .withValues(alpha: 0.14),
+                          borderRadius:
+                              BorderRadius.circular(_innerRadius),
+                        ),
+                      ),
                     ),
-                  ),
-              ],
+                    Row(
+                      children: [
+                        for (var i = 0; i < _kNavItems.length; i++)
+                          Expanded(
+                            child: _PillNavItem(
+                              item: _kNavItems[i],
+                              active: currentIndex == i,
+                              onTap: () => onChanged(i),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -172,51 +200,51 @@ class _PillNavItem extends StatelessWidget {
   final _NavItem item;
   final bool active;
   final VoidCallback onTap;
-  final double radius;
   const _PillNavItem({
     required this.item,
     required this.active,
     required this.onTap,
-    required this.radius,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.sleepAccent : AppColors.textSecondary;
+    // Lerp icon/label color in sync with the sliding indicator so the
+    // selection state visually settles together (instead of color snapping
+    // before the pill arrives).
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      // Pill stretches to fill its full 33% slot. Radius matches the
-      // outer container minus the 4px inset for concentric corners.
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.sleepAccent.withValues(alpha: 0.14)
-              : CupertinoColors.transparent,
-          borderRadius: BorderRadius.circular(radius),
-        ),
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(item.icon, size: 18, color: color),
-            const SizedBox(height: 2),
-            Text(
-              item.label,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                color: color,
-                letterSpacing: 0.1,
-                height: 1.1,
-              ),
+        tween: Tween(begin: active ? 1.0 : 0.0, end: active ? 1.0 : 0.0),
+        builder: (context, t, _) {
+          final color = Color.lerp(
+            AppColors.textSecondary,
+            AppColors.sleepAccent,
+            t,
+          )!;
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(item.icon, size: 18, color: color),
+                const SizedBox(height: 2),
+                Text(
+                  item.label,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                    color: color,
+                    letterSpacing: 0.1,
+                    height: 1.1,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

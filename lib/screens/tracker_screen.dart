@@ -1,9 +1,11 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+
+import '../widgets/sticky_header.dart';
+import '../widgets/wakeup_refresh.dart';
 
 import '../models/baby_event.dart';
 import '../models/baby_session.dart';
@@ -74,11 +76,43 @@ class _TrackerScreenState extends State<TrackerScreen> {
         slivers: [
           SliverPersistentHeader(
             pinned: true,
-            delegate: _NomNapStickyHeader(
+            delegate: StickyGlassHeader(
               topInset: topInset,
-              onAdd: () => AddEntrySheet.show(context, widget.store),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset(
+                    'assets/logo/nomnap_mark_compact.svg',
+                    height: 48,
+                    semanticsLabel: 'NomNap',
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'nomnap',
+                    style: TextStyle(
+                      fontFamily: '.SF Pro Rounded',
+                      fontFamilyFallback: ['SF Pro Rounded', '.SF Pro Display'],
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1.2,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              trailing: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(44, 44),
+                onPressed: () => AddEntrySheet.show(context, widget.store),
+                child: const Icon(
+                  CupertinoIcons.add_circled_solid,
+                  color: AppColors.sleepAccent,
+                  size: 32,
+                ),
+              ),
             ),
           ),
+          const WakeupRefreshControl(),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(
               20,
@@ -149,86 +183,6 @@ String _greetingForHour(int h) {
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
-}
-
-const double _kHeaderContentHeight = 72;
-
-class _NomNapStickyHeader extends SliverPersistentHeaderDelegate {
-  final double topInset;
-  final VoidCallback onAdd;
-  const _NomNapStickyHeader({required this.topInset, required this.onAdd});
-
-  @override
-  double get minExtent => _kHeaderContentHeight + topInset;
-  @override
-  double get maxExtent => _kHeaderContentHeight + topInset;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-        child: Container(
-          decoration: BoxDecoration(
-            // White-tinted glass that reads as distinct from the gray scaffold
-            // even when there's nothing behind to blur (i.e. at scroll origin).
-            color: CupertinoColors.white.withValues(alpha: 0.72),
-            border: Border(
-              bottom: BorderSide(
-                color: AppColors.divider
-                    .withValues(alpha: overlapsContent ? 1.0 : 0.4),
-                width: 0.5,
-              ),
-            ),
-          ),
-          padding: EdgeInsets.only(top: topInset),
-          child: SizedBox(
-            height: _kHeaderContentHeight,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 12, 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    'assets/logo/nomnap_mark_compact.svg',
-                    height: 48,
-                    semanticsLabel: 'NomNap',
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'nomnap',
-                    style: TextStyle(
-                      fontFamily: '.SF Pro Rounded',
-                      fontFamilyFallback: ['SF Pro Rounded', '.SF Pro Display'],
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1.2,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const Spacer(),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(44, 44),
-                    onPressed: onAdd,
-                    child: const Icon(
-                      CupertinoIcons.add_circled_solid,
-                      color: AppColors.sleepAccent,
-                      size: 32,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _NomNapStickyHeader old) =>
-      old.topInset != topInset || old.onAdd != onAdd;
 }
 
 class _ActionCard extends StatelessWidget {

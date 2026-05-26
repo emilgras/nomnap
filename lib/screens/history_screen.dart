@@ -6,6 +6,8 @@ import '../services/event_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
+import '../widgets/sticky_header.dart';
+import '../widgets/wakeup_refresh.dart';
 import 'app_shell.dart' show kFloatingNavReserve;
 import 'tracker_screen.dart' show SessionRow;
 
@@ -238,30 +240,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final grouped = _groupByDay(sessions);
     final days = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
+    final topInset = MediaQuery.of(context).padding.top;
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       child: CustomScrollView(
         slivers: [
-          CupertinoSliverNavigationBar(
-            largeTitle: const Text('History'),
-            backgroundColor: AppColors.background,
-            border: null,
-            bottom: const PreferredSize(
-              preferredSize: Size.fromHeight(10),
-              child: SizedBox.shrink(),
-            ),
-            trailing: sessions.isEmpty
-                ? null
-                : CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _confirmClear,
-                    child: const Icon(
-                      CupertinoIcons.trash,
-                      color: AppColors.danger,
-                      size: 22,
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: StickyGlassHeader(
+              topInset: topInset,
+              title: const StickyHeaderTitle('History'),
+              trailing: sessions.isEmpty
+                  ? null
+                  : CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(44, 44),
+                      onPressed: _confirmClear,
+                      child: const Icon(
+                        CupertinoIcons.trash,
+                        color: AppColors.danger,
+                        size: 22,
+                      ),
                     ),
-                  ),
+            ),
           ),
+          const WakeupRefreshControl(),
           if (sessions.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,

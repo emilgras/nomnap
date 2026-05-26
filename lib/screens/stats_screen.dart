@@ -5,6 +5,8 @@ import '../services/statistics.dart';
 import '../theme/app_theme.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
+import '../widgets/sticky_header.dart';
+import '../widgets/wakeup_refresh.dart';
 import 'app_shell.dart' show kFloatingNavReserve;
 
 class StatsScreen extends StatefulWidget {
@@ -36,23 +38,23 @@ class _StatsScreenState extends State<StatsScreen> {
     final daily = stats.dailyStats;
     final hasData = daily.isNotEmpty;
 
+    final topInset = MediaQuery.of(context).padding.top;
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       child: CustomScrollView(
         slivers: [
-          CupertinoSliverNavigationBar(
-            largeTitle: const Text('Statistics'),
-            backgroundColor: AppColors.background,
-            border: null,
-            bottom: const PreferredSize(
-              preferredSize: Size.fromHeight(10),
-              child: SizedBox.shrink(),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: StickyGlassHeader(
+              topInset: topInset,
+              title: const StickyHeaderTitle('Stats'),
             ),
           ),
+          const WakeupRefreshControl(),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(
               16,
-              4,
+              16,
               16,
               MediaQuery.of(context).padding.bottom + kFloatingNavReserve,
             ),

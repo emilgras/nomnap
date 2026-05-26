@@ -108,13 +108,20 @@ class _FloatingPillNav extends StatelessWidget {
     required this.onChanged,
   });
 
+  // For concentric rounded corners: inner radius = outer radius − inset.
+  // height=58 ⇒ full stadium radius = 29; with a uniform 4px inset on all
+  // sides the inner active pill needs radius 25 to match the outer curve.
+  static const double _outerRadius = 29;
+  static const double _innerInset = 4;
+  static const double _innerRadius = _outerRadius - _innerInset; // 25
+
   @override
   Widget build(BuildContext context) {
     // Outer DecoratedBox carries the shadow (outside the clip);
     // inner ClipRRect clips the blur + solid background cleanly.
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(_outerRadius),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF1A1A2E).withValues(alpha: 0.14),
@@ -129,7 +136,8 @@ class _FloatingPillNav extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(_outerRadius),
+        clipBehavior: Clip.antiAlias,
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
           child: Container(
@@ -137,20 +145,18 @@ class _FloatingPillNav extends StatelessWidget {
             // Solid translucent white — the *menu* itself doesn't carry the
             // gradient (the soft tinted backdrop in AppShell does that job).
             color: CupertinoColors.white.withValues(alpha: 0.82),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            // Uniform 4px inset on all sides ⇒ leftmost/rightmost active pill
+            // curves are perfectly concentric with the outer container.
+            padding: const EdgeInsets.all(_innerInset),
             child: Row(
               children: [
                 for (var i = 0; i < _kNavItems.length; i++)
                   Expanded(
-                    // Each item gets exactly 1/n of the menu width and
-                    // its pill fills that slot (minus a small gutter).
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: _PillNavItem(
-                        item: _kNavItems[i],
-                        active: currentIndex == i,
-                        onTap: () => onChanged(i),
-                      ),
+                    child: _PillNavItem(
+                      item: _kNavItems[i],
+                      active: currentIndex == i,
+                      onTap: () => onChanged(i),
+                      radius: _innerRadius,
                     ),
                   ),
               ],
@@ -166,10 +172,12 @@ class _PillNavItem extends StatelessWidget {
   final _NavItem item;
   final bool active;
   final VoidCallback onTap;
+  final double radius;
   const _PillNavItem({
     required this.item,
     required this.active,
     required this.onTap,
+    required this.radius,
   });
 
   @override
@@ -178,8 +186,8 @@ class _PillNavItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      // Pill stretches to fill its 33% slot (minus the 2px gutter on
-      // each side). When active the indigo tint lights up the whole slot.
+      // Pill stretches to fill its full 33% slot. Radius matches the
+      // outer container minus the 4px inset for concentric corners.
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
@@ -188,7 +196,7 @@ class _PillNavItem extends StatelessWidget {
           color: active
               ? AppColors.sleepAccent.withValues(alpha: 0.14)
               : CupertinoColors.transparent,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(radius),
         ),
         alignment: Alignment.center,
         child: Column(

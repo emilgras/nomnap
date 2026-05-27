@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:intl/intl.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/baby_event.dart';
 import '../models/baby_session.dart';
 import '../services/event_store.dart';
+import '../services/file_io.dart' as file_io;
 import '../theme/app_theme.dart';
 import '../widgets/section_card.dart';
 import '../widgets/sticky_header.dart';
@@ -42,6 +44,51 @@ class _HistoryScreenState extends State<HistoryScreen> {
       map.putIfAbsent(k, () => []).add(item);
     }
     return map;
+  }
+
+  Future<void> _exportData() async {
+    final json = widget.store.exportJson();
+    final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    await file_io.downloadFile('nomnap_backup_$date.json', json);
+  }
+
+  Future<void> _importData() async {
+    final json = await file_io.pickAndReadFile();
+    if (json == null || !mounted) return;
+    try {
+      final count = await widget.store.importJson(json);
+      if (!mounted) return;
+      showCupertinoDialog(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          title: const Text('Import complete'),
+          content: Text(count > 0
+              ? 'Imported $count new events.'
+              : 'No new events to import (all already exist).'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showCupertinoDialog(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          title: const Text('Import failed'),
+          content: const Text('The file is not a valid NomNap backup.'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _confirmClear() async {
@@ -350,11 +397,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
             delegate: StickyGlassHeader(
               topInset: topInset,
               title: StickyHeaderTitle(S.of(context).history),
-              trailing: timeline.isEmpty
-                  ? null
-                  : CupertinoButton(
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(40, 44),
+                    onPressed: _importData,
+                    child: const Icon(
+                      CupertinoIcons.tray_arrow_down,
+                      color: AppColors.sleepAccent,
+                      size: 22,
+                    ),
+                  ),
+                  if (timeline.isNotEmpty)
+                    CupertinoButton(
                       padding: EdgeInsets.zero,
-                      minimumSize: const Size(44, 44),
+                      minimumSize: const Size(40, 44),
+                      onPressed: _exportData,
+                      child: const Icon(
+                        CupertinoIcons.tray_arrow_up,
+                        color: AppColors.sleepAccent,
+                        size: 22,
+                      ),
+                    ),
+                  if (timeline.isNotEmpty)
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(40, 44),
                       onPressed: _confirmClear,
                       child: const Icon(
                         CupertinoIcons.trash,
@@ -362,6 +432,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         size: 22,
                       ),
                     ),
+                ],
+              ),
             ),
           ),
           const WakeupRefreshControl(),

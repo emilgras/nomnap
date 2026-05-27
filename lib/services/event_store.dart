@@ -183,4 +183,19 @@ class EventStore extends ChangeNotifier {
     if (!session.isOngoing) return;
     await add(session.kind.endType, at: at);
   }
+
+  String exportJson() => BabyEvent.encodeList(_events);
+
+  Future<int> importJson(String json) async {
+    final imported = BabyEvent.decodeList(json);
+    if (imported.isEmpty) return 0;
+    final existingIds = _events.map((e) => e.id).toSet();
+    final newEvents = imported.where((e) => !existingIds.contains(e.id)).toList();
+    if (newEvents.isEmpty) return 0;
+    _events.addAll(newEvents);
+    _sort();
+    notifyListeners();
+    await _persist();
+    return newEvents.length;
+  }
 }

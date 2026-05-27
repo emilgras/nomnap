@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/event_store.dart';
 import '../services/statistics.dart';
 import '../theme/app_theme.dart';
@@ -47,7 +49,7 @@ class _StatsScreenState extends State<StatsScreen> {
             pinned: true,
             delegate: StickyGlassHeader(
               topInset: topInset,
-              title: const StickyHeaderTitle('Stats'),
+              title: StickyHeaderTitle(S.of(context).stats),
             ),
           ),
           const WakeupRefreshControl(),
@@ -66,7 +68,7 @@ class _StatsScreenState extends State<StatsScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       child: Center(
                         child: Text(
-                          'No data yet.\nTrack a few sleeps and feeds to see your averages.',
+                          S.of(context).noDataYet,
                           textAlign: TextAlign.center,
                           style: AppText.subhead,
                         ),
@@ -74,28 +76,30 @@ class _StatsScreenState extends State<StatsScreen> {
                     ),
                   )
                 else ...[
-                  const SectionHeader('Daily averages'),
+                  SectionHeader(S.of(context).dailyAverages),
                   _AvgGrid(stats: stats),
+                  const SizedBox(height: 12),
+                  _DiaperAvgTile(stats: stats),
                   const SizedBox(height: 24),
-                  const SectionHeader('Session averages'),
+                  SectionHeader(S.of(context).sessionAverages),
                   SectionCard(
                     padding: EdgeInsets.zero,
                     child: Column(
                       children: [
                         _StatRow(
-                          label: 'Avg sleep length',
+                          label: S.of(context).avgSleepLength,
                           value: formatDuration(stats.avgSleepDuration),
                           accent: AppColors.sleepAccent,
                         ),
                         const _RowDivider(),
                         _StatRow(
-                          label: 'Avg feed length',
+                          label: S.of(context).avgFeedLength,
                           value: formatDuration(stats.avgFeedDuration),
                           accent: AppColors.feedAccent,
                         ),
                         const _RowDivider(),
                         _StatRow(
-                          label: 'Longest sleep',
+                          label: S.of(context).longestSleep,
                           value: formatDuration(stats.longestSleep),
                           accent: AppColors.sleepAccent,
                         ),
@@ -103,7 +107,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const SectionHeader('By day'),
+                  SectionHeader(S.of(context).byDay),
                   SectionCard(
                     padding: EdgeInsets.zero,
                     child: Column(
@@ -130,6 +134,7 @@ class _AvgGrid extends StatelessWidget {
   const _AvgGrid({required this.stats});
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return Row(
       children: [
         Expanded(
@@ -138,8 +143,8 @@ class _AvgGrid extends StatelessWidget {
             accent: AppColors.sleepAccent,
             softBg: AppColors.sleepSoft,
             value: formatDuration(stats.avgDailySleep),
-            label: 'Sleep / day',
-            sub: '${stats.avgSleepsPerDay.toStringAsFixed(1)} sessions',
+            label: s.sleepPerDay,
+            sub: '${stats.avgSleepsPerDay.toStringAsFixed(1)} ${s.sessions}',
           ),
         ),
         const SizedBox(width: 12),
@@ -149,8 +154,8 @@ class _AvgGrid extends StatelessWidget {
             accent: AppColors.feedAccent,
             softBg: AppColors.feedSoft,
             value: formatDuration(stats.avgDailyFeed),
-            label: 'Feeding / day',
-            sub: '${stats.avgFeedsPerDay.toStringAsFixed(1)} sessions',
+            label: s.feedingPerDay,
+            sub: '${stats.avgFeedsPerDay.toStringAsFixed(1)} ${s.sessions}',
           ),
         ),
       ],
@@ -195,6 +200,54 @@ class _AvgTile extends StatelessWidget {
           Text(label, style: AppText.subhead),
           const SizedBox(height: 2),
           Text(sub, style: AppText.caption),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiaperAvgTile extends StatelessWidget {
+  final Statistics stats;
+  const _DiaperAvgTile({required this.stats});
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.diaperSoft,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Center(
+              child: SvgPicture.asset(
+                'assets/icons/poop.svg',
+                width: 16,
+                height: 16,
+                colorFilter: const ColorFilter.mode(AppColors.diaperAccent, BlendMode.srcIn),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  S.of(context).diapersPerDay(stats.avgDiapersPerDay.toStringAsFixed(1)),
+                  style: AppText.title.copyWith(fontSize: 18),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${stats.avgPeesPerDay.toStringAsFixed(1)} Pee  ${stats.avgPoopsPerDay.toStringAsFixed(1)} Poo',
+                  style: AppText.caption,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -246,7 +299,7 @@ class _DailyRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(formatDayHeader(d.day), style: AppText.callout),
+            child: Text(S.of(context).formatDayHeader(d.day), style: AppText.callout),
           ),
           _Chip(
             icon: CupertinoIcons.moon_fill,
@@ -263,6 +316,21 @@ class _DailyRow extends StatelessWidget {
             accent: AppColors.feedAccent,
             softBg: AppColors.feedSoft,
           ),
+          if (d.diaperCount > 0) ...[
+            const SizedBox(width: 8),
+            _Chip(
+              iconWidget: SvgPicture.asset(
+                'assets/icons/poop.svg',
+                width: 12,
+                height: 12,
+                colorFilter: const ColorFilter.mode(AppColors.diaperAccent, BlendMode.srcIn),
+              ),
+              text: '${d.diaperCount}',
+              sub: '',
+              accent: AppColors.diaperAccent,
+              softBg: AppColors.diaperSoft,
+            ),
+          ],
         ],
       ),
     );
@@ -270,13 +338,15 @@ class _DailyRow extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final String text;
   final String sub;
   final Color accent;
   final Color softBg;
   const _Chip({
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.text,
     required this.sub,
     required this.accent,
@@ -293,7 +363,7 @@ class _Chip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: accent, size: 12),
+          iconWidget ?? Icon(icon, color: accent, size: 12),
           const SizedBox(width: 5),
           Text(
             text,

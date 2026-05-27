@@ -1,13 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/baby_event.dart';
 import '../services/event_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/format.dart';
 
-enum _Kind { sleep, feed }
+enum _Kind { sleep, feed, diaper }
 
 class AddEntrySheet extends StatefulWidget {
   final EventStore store;
@@ -33,6 +33,8 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
   bool _ongoing = false;
   bool _saving = false;
   String? _error;
+  bool _isPoop = false;
+  String _feedSide = 'L';
 
   @override
   void initState() {
@@ -44,7 +46,6 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
   }
 
   _Kind _inferKind() {
-    // Default to whichever kind was last logged.
     for (var i = widget.store.events.length - 1; i >= 0; i--) {
       final t = widget.store.events[i].type;
       if (t == EventType.sleepStart || t == EventType.sleepEnd) {
@@ -53,6 +54,7 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
       if (t == EventType.feedStart || t == EventType.feedEnd) {
         return _Kind.feed;
       }
+      if (t.isDiaper) return _Kind.diaper;
     }
     return _Kind.sleep;
   }
@@ -62,19 +64,36 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
       : widget.store.isFeeding;
 
   Future<void> _save() async {
+    final s = S.of(context);
+    if (_kind == _Kind.diaper) {
+      if (_start.isAfter(DateTime.now())) {
+        setState(() => _error = s.errorTimeFuture);
+        return;
+      }
+      setState(() {
+        _saving = true;
+        _error = null;
+      });
+      HapticFeedback.mediumImpact();
+      final type = _isPoop ? EventType.diaperPoop : EventType.diaperPee;
+      await widget.store.add(type, at: _start);
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
     if (_ongoing) {
       if (_kindAlreadyOngoing) {
         setState(() => _error =
-            'A ${_kind == _Kind.sleep ? 'sleep' : 'feed'} is already in progress.');
+            _kind == _Kind.sleep ? s.sleepAlreadyInProgress : s.feedAlreadyInProgress);
         return;
       }
       if (_start.isAfter(DateTime.now())) {
-        setState(() => _error = "Start can't be in the future.");
+        setState(() => _error = s.errorStartFuture);
         return;
       }
     } else {
       if (!_end.isAfter(_start)) {
-        setState(() => _error = 'End must be after start.');
+        setState(() => _error = s.errorEndAfterStart);
         return;
       }
     }
@@ -86,8 +105,9 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
     final startType = _kind == _Kind.sleep
         ? EventType.sleepStart
         : EventType.feedStart;
+    final feedMeta = _kind == _Kind.feed ? {'side': _feedSide} : null;
     if (_ongoing) {
-      await widget.store.add(startType, at: _start);
+      await widget.store.add(startType, at: _start, meta: feedMeta);
     } else {
       final endType =
           _kind == _Kind.sleep ? EventType.sleepEnd : EventType.feedEnd;
@@ -96,12 +116,14 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
         endType: endType,
         start: _start,
         end: _end,
+        startMeta: feedMeta,
       );
     }
     if (mounted) Navigator.of(context).pop();
   }
 
   void _pickTime({required bool isStart}) {
+    final s = S.of(context);
     final initial = isStart ? _start : _end;
     DateTime working = initial;
     showCupertinoModalPopup(
@@ -120,12 +142,12 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
                     CupertinoButton(
                       padding: EdgeInsets.zero,
                       onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel'),
+                      child: Text(s.cancel),
                     ),
                     Expanded(
                       child: Center(
                         child: Text(
-                          isStart ? 'Start time' : 'End time',
+                          isStart ? s.startTime : s.endTime,
                           style: AppText.headline,
                         ),
                       ),
@@ -144,7 +166,7 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
                         Navigator.pop(ctx);
                       },
                       child: Text(
-                        'Done',
+                        s.done,
                         style: AppText.headline.copyWith(
                           color: AppColors.sleepAccent,
                         ),
@@ -171,9 +193,12 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final accent = _kind == _Kind.sleep
         ? AppColors.sleepAccent
-        : AppColors.feedAccent;
+        : _kind == _Kind.feed
+            ? AppColors.feedAccent
+            : AppColors.diaperAccent;
     final duration = _end.isAfter(_start)
         ? _end.difference(_start)
         : Duration.zero;
@@ -211,18 +236,18 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
                       onPressed: _saving
                           ? null
                           : () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text(s.cancel),
                     ),
                     Expanded(
                       child: Center(
-                        child: Text('Add entry', style: AppText.headline),
+                        child: Text(s.addEntry, style: AppText.headline),
                       ),
                     ),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
                       onPressed: _saving ? null : _save,
                       child: Text(
-                        'Save',
+                        s.save,
                         style: AppText.headline.copyWith(
                           color: accent,
                           fontWeight: FontWeight.w600,
@@ -243,53 +268,115 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
                 children: {
                   _Kind.sleep: _SegmentLabel(
                     icon: CupertinoIcons.moon_fill,
-                    text: 'Sleep',
+                    text: s.sleep,
                     selected: _kind == _Kind.sleep,
                     accent: AppColors.sleepAccent,
                   ),
                   _Kind.feed: _SegmentLabel(
                     icon: CupertinoIcons.drop_fill,
-                    text: 'Feed',
+                    text: s.feed,
                     selected: _kind == _Kind.feed,
                     accent: AppColors.feedAccent,
+                  ),
+                  _Kind.diaper: _SegmentLabel(
+                    icon: CupertinoIcons.tornado,
+                    text: s.diaper,
+                    selected: _kind == _Kind.diaper,
+                    accent: AppColors.diaperAccent,
                   ),
                 },
               ),
               const SizedBox(height: 16),
-              _OngoingRow(
-                value: _ongoing,
-                accent: accent,
-                onChanged: (v) => setState(() {
-                  _ongoing = v;
-                  _error = null;
-                }),
-              ),
-              const SizedBox(height: 10),
-              _TimeRow(
-                label: 'Started',
-                value: _formatStamp(_start),
-                onTap: () => _pickTime(isStart: true),
-              ),
-              if (!_ongoing) ...[
+              if (_kind == _Kind.feed) ...[
+                CupertinoSlidingSegmentedControl<String>(
+                  groupValue: _feedSide,
+                  onValueChanged: (v) {
+                    if (v != null) setState(() => _feedSide = v);
+                  },
+                  thumbColor: AppColors.surface,
+                  backgroundColor: AppColors.divider.withValues(alpha: 0.6),
+                  children: {
+                    'L': _SegmentLabel(
+                      icon: CupertinoIcons.arrow_left,
+                      text: s.left,
+                      selected: _feedSide == 'L',
+                      accent: AppColors.feedAccent,
+                    ),
+                    'R': _SegmentLabel(
+                      icon: CupertinoIcons.arrow_right,
+                      text: s.right,
+                      selected: _feedSide == 'R',
+                      accent: AppColors.feedAccent,
+                    ),
+                  },
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (_kind == _Kind.diaper) ...[
+                CupertinoSlidingSegmentedControl<bool>(
+                  groupValue: _isPoop,
+                  onValueChanged: (v) {
+                    if (v != null) setState(() => _isPoop = v);
+                  },
+                  thumbColor: AppColors.surface,
+                  backgroundColor: AppColors.divider.withValues(alpha: 0.6),
+                  children: {
+                    false: _SegmentLabel(
+                      icon: CupertinoIcons.drop,
+                      text: s.pee,
+                      selected: !_isPoop,
+                      accent: AppColors.diaperAccent,
+                    ),
+                    true: _SegmentLabel(
+                      icon: CupertinoIcons.circle_fill,
+                      text: s.poop,
+                      selected: _isPoop,
+                      accent: AppColors.diaperAccent,
+                    ),
+                  },
+                ),
                 const SizedBox(height: 10),
                 _TimeRow(
-                  label: 'Ended',
-                  value: _formatStamp(_end),
-                  onTap: () => _pickTime(isStart: false),
+                  label: s.time,
+                  value: s.formatStamp(_start),
+                  onTap: () => _pickTime(isStart: true),
                 ),
-              ],
-              const SizedBox(height: 18),
-              Center(
-                child: Text(
-                  _ongoing
-                      ? 'In progress'
-                      : 'Duration  ${formatDuration(duration)}',
-                  style: AppText.subhead.copyWith(
-                    color: accent,
-                    fontWeight: FontWeight.w500,
+              ] else ...[
+                _OngoingRow(
+                  value: _ongoing,
+                  accent: accent,
+                  onChanged: (v) => setState(() {
+                    _ongoing = v;
+                    _error = null;
+                  }),
+                ),
+                const SizedBox(height: 10),
+                _TimeRow(
+                  label: s.started,
+                  value: s.formatStamp(_start),
+                  onTap: () => _pickTime(isStart: true),
+                ),
+                if (!_ongoing) ...[
+                  const SizedBox(height: 10),
+                  _TimeRow(
+                    label: s.ended,
+                    value: s.formatStamp(_end),
+                    onTap: () => _pickTime(isStart: false),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Center(
+                  child: Text(
+                    _ongoing
+                        ? s.inProgress
+                        : s.durationLabel(formatDuration(duration)),
+                    style: AppText.subhead.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 10),
                 Center(
@@ -307,21 +394,6 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
     );
   }
 
-  String _formatStamp(DateTime t) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final dd = DateTime(t.year, t.month, t.day);
-    final diff = today.difference(dd).inDays;
-    String prefix;
-    if (diff == 0) {
-      prefix = 'Today';
-    } else if (diff == 1) {
-      prefix = 'Yesterday';
-    } else {
-      prefix = DateFormat('EEE, MMM d').format(t);
-    }
-    return '$prefix  ${DateFormat('HH:mm').format(t)}';
-  }
 }
 
 class _SegmentLabel extends StatelessWidget {
@@ -381,7 +453,7 @@ class _OngoingRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text('Still in progress', style: AppText.callout),
+          Text(S.of(context).stillInProgress, style: AppText.callout),
           const Spacer(),
           CupertinoSwitch(
             value: value,

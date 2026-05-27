@@ -20,6 +20,8 @@ class AppColors {
   static const sleepSoft = Color(0xFFEEF0FF);
   static const feedAccent = Color(0xFFFF8A65);    // warm coral
   static const feedSoft = Color(0xFFFFF1EC);
+  static const diaperAccent = Color(0xFF43A692);  // teal green
+  static const diaperSoft = Color(0xFFE8F5F1);
 
   // Status
   static const success = Color(0xFF34C759);

@@ -4,6 +4,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../l10n/app_localizations.dart';
+import '../l10n/locale_provider.dart';
 import '../widgets/sticky_header.dart';
 import '../widgets/wakeup_refresh.dart';
 
@@ -53,9 +55,17 @@ class _TrackerScreenState extends State<TrackerScreen> {
     unawaited(HapticFeedback.mediumImpact());
   }
 
-  Future<void> _toggleFeed() async {
-    final type =
-        widget.store.isFeeding ? EventType.feedEnd : EventType.feedStart;
+  Future<void> _startFeed(String side) async {
+    await widget.store.add(EventType.feedStart, meta: {'side': side});
+    unawaited(HapticFeedback.mediumImpact());
+  }
+
+  Future<void> _stopFeed() async {
+    await widget.store.add(EventType.feedEnd);
+    unawaited(HapticFeedback.mediumImpact());
+  }
+
+  Future<void> _logDiaper(EventType type) async {
     await widget.store.add(type);
     unawaited(HapticFeedback.mediumImpact());
   }
@@ -100,15 +110,40 @@ class _TrackerScreenState extends State<TrackerScreen> {
                   ),
                 ],
               ),
-              trailing: CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(44, 44),
-                onPressed: () => AddEntrySheet.show(context, widget.store),
-                child: const Icon(
-                  CupertinoIcons.add_circled_solid,
-                  color: AppColors.sleepAccent,
-                  size: 32,
-                ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(44, 44),
+                    onPressed: () => LocaleScope.of(context).toggle(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.sleepSoft,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        S.of(context).localeCode.toUpperCase(),
+                        style: AppText.caption.copyWith(
+                          color: AppColors.sleepAccent,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(44, 44),
+                    onPressed: () => AddEntrySheet.show(context, widget.store),
+                    child: const Icon(
+                      CupertinoIcons.add_circled_solid,
+                      color: AppColors.sleepAccent,
+                      size: 32,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -122,7 +157,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
             ),
             sliver: SliverToBoxAdapter(
               child: Text(
-                _greetingForHour(DateTime.now().hour),
+                S.of(context).greetingForHour(DateTime.now().hour),
                 style: AppText.subhead,
               ),
             ),
@@ -137,38 +172,37 @@ class _TrackerScreenState extends State<TrackerScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _ActionCard(
-                  title: 'Sleep',
+                  title: S.of(context).sleep,
                   active: isSleeping,
                   startedAt: store.sleepStartedAt,
                   accent: AppColors.sleepAccent,
                   softBg: AppColors.sleepSoft,
                   icon: CupertinoIcons.moon_fill,
-                  activeLabel: 'Sleeping',
-                  inactiveLabel: 'Awake',
-                  buttonStart: 'Start Sleep',
-                  buttonStop: 'Wake Up',
+                  activeLabel: S.of(context).sleeping,
+                  inactiveLabel: S.of(context).awake,
+                  buttonStart: S.of(context).startSleep,
+                  buttonStop: S.of(context).wakeUp,
                   onToggle: _toggleSleep,
                 ),
-                const SizedBox(height: 14),
-                _ActionCard(
-                  title: 'Feed',
+                const SizedBox(height: 12),
+                _FeedCard(
                   active: isFeeding,
                   startedAt: store.feedStartedAt,
-                  accent: AppColors.feedAccent,
-                  softBg: AppColors.feedSoft,
-                  icon: CupertinoIcons.drop_fill,
-                  activeLabel: 'Feeding',
-                  inactiveLabel: 'Not feeding',
-                  buttonStart: 'Start Feed',
-                  buttonStop: 'Stop Feed',
-                  onToggle: _toggleFeed,
+                  side: store.feedSide,
+                  onStart: _startFeed,
+                  onStop: _stopFeed,
                 ),
+                const SizedBox(height: 12),
+                _DiaperCard(onLog: _logDiaper),
                 const SizedBox(height: 28),
-                const SectionHeader('Today'),
+                SectionHeader(S.of(context).today),
                 _TodaySummary(daily: today),
                 const SizedBox(height: 28),
-                const SectionHeader('Recent activity'),
-                _RecentActivity(sessions: store.sessions),
+                SectionHeader(S.of(context).recentActivity),
+                _RecentActivity(
+                  sessions: store.sessions,
+                  diaperEvents: store.diaperEvents,
+                ),
               ]),
             ),
           ),
@@ -176,13 +210,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
       ),
     );
   }
-}
-
-String _greetingForHour(int h) {
-  if (h < 5) return 'Good night';
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
 }
 
 class _ActionCard extends StatelessWidget {
@@ -219,20 +246,20 @@ class _ActionCard extends StatelessWidget {
         : Duration.zero;
 
     return SectionCard(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: softBg,
-                  borderRadius: BorderRadius.circular(11),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: accent, size: 20),
+                child: Icon(icon, color: accent, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -243,7 +270,7 @@ class _ActionCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       active ? activeLabel : inactiveLabel,
-                      style: AppText.subhead.copyWith(
+                      style: AppText.footnote.copyWith(
                         color: active ? accent : AppColors.textSecondary,
                         fontWeight: active ? FontWeight.w500 : FontWeight.w400,
                       ),
@@ -269,31 +296,52 @@ class _ActionCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 18),
-          Center(
-            child: Text(
-              active ? formatDurationLong(elapsed) : '—',
-              style: AppText.timerLarge.copyWith(
-                color: active ? AppColors.textPrimary : AppColors.textTertiary,
-              ),
-            ),
-          ),
-          if (active && startedAt != null) ...[
-            const SizedBox(height: 2),
+          if (active) ...[
+            const SizedBox(height: 12),
             Center(
               child: Text(
-                'Since ${formatClock(startedAt!)}',
-                style: AppText.footnote,
+                formatDurationLong(elapsed),
+                style: AppText.timerLarge.copyWith(
+                  fontSize: 36,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
+            if (startedAt != null) ...[
+              const SizedBox(height: 2),
+              Center(
+                child: Text(
+                  S.of(context).since(formatClock(startedAt!)),
+                  style: AppText.footnote,
+                ),
+              ),
+            ],
           ],
-          const SizedBox(height: 18),
-          _BigButton(
-            label: active ? buttonStop : buttonStart,
-            background: active ? AppColors.surface : accent,
-            foreground: active ? accent : CupertinoColors.white,
-            border: active ? accent : null,
-            onPressed: onToggle,
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 46,
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              color: active ? AppColors.surface : accent,
+              onPressed: () => onToggle(),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadius.button),
+                  border: active
+                      ? Border.all(color: accent, width: 1.4)
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  active ? buttonStop : buttonStart,
+                  style: AppText.callout.copyWith(
+                    color: active ? accent : CupertinoColors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -301,44 +349,301 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-class _BigButton extends StatelessWidget {
+class _FeedCard extends StatelessWidget {
+  final bool active;
+  final DateTime? startedAt;
+  final String? side;
+  final Future<void> Function(String side) onStart;
+  final Future<void> Function() onStop;
+
+  const _FeedCard({
+    required this.active,
+    required this.startedAt,
+    required this.side,
+    required this.onStart,
+    required this.onStop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final sl = s.sideLabel(side);
+    final elapsed = active && startedAt != null
+        ? DateTime.now().difference(startedAt!)
+        : Duration.zero;
+
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.feedSoft,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(CupertinoIcons.drop_fill,
+                    color: AppColors.feedAccent, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.feed, style: AppText.headline),
+                    const SizedBox(height: 2),
+                    Text(
+                      active
+                          ? (sl.isNotEmpty
+                              ? '${s.feeding} · $sl'
+                              : s.feeding)
+                          : s.notFeeding,
+                      style: AppText.footnote.copyWith(
+                        color: active
+                            ? AppColors.feedAccent
+                            : AppColors.textSecondary,
+                        fontWeight: active ? FontWeight.w500 : FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (active)
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: AppColors.feedAccent,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.feedAccent.withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          if (active) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                formatDurationLong(elapsed),
+                style: AppText.timerLarge.copyWith(
+                  fontSize: 36,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (startedAt != null) ...[
+              const SizedBox(height: 2),
+              Center(
+                child: Text(
+                  S.of(context).since(formatClock(startedAt!)),
+                  style: AppText.footnote,
+                ),
+              ),
+            ],
+          ],
+          const SizedBox(height: 14),
+          if (active)
+            SizedBox(
+              height: 46,
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                borderRadius: BorderRadius.circular(AppRadius.button),
+                color: AppColors.surface,
+                onPressed: () => onStop(),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                    border: Border.all(color: AppColors.feedAccent, width: 1.4),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    s.stopFeed,
+                    style: AppText.callout.copyWith(
+                      color: AppColors.feedAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 46,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                      color: AppColors.feedAccent,
+                      onPressed: () => onStart('L'),
+                      child: Text(
+                        s.left,
+                        style: AppText.callout.copyWith(
+                          color: CupertinoColors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 46,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                      color: AppColors.feedAccent,
+                      onPressed: () => onStart('R'),
+                      child: Text(
+                        s.right,
+                        style: AppText.callout.copyWith(
+                          color: CupertinoColors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiaperCard extends StatefulWidget {
+  final Future<void> Function(EventType) onLog;
+  const _DiaperCard({required this.onLog});
+
+  @override
+  State<_DiaperCard> createState() => _DiaperCardState();
+}
+
+class _DiaperCardState extends State<_DiaperCard> {
+  // null = idle, 'pee' or 'poop' = which button is showing a checkmark
+  String? _confirmed;
+
+  Future<void> _onTap(EventType type) async {
+    setState(() => _confirmed = type == EventType.diaperPee ? 'pee' : 'poop');
+    await widget.onLog(type);
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) setState(() => _confirmed = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.diaperSoft,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: SvgPicture.asset(
+                'assets/icons/poop.svg',
+                width: 18,
+                height: 18,
+                colorFilter: const ColorFilter.mode(AppColors.diaperAccent, BlendMode.srcIn),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(S.of(context).diaper, style: AppText.headline),
+                const SizedBox(height: 1),
+                Text(S.of(context).logAChange, style: AppText.footnote),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          _DiaperButton(
+            label: S.of(context).pee,
+            background: AppColors.diaperSoft,
+            foreground: AppColors.diaperAccent,
+            showCheck: _confirmed == 'pee',
+            onPressed: () => _onTap(EventType.diaperPee),
+          ),
+          const SizedBox(width: 8),
+          _DiaperButton(
+            label: S.of(context).poop,
+            background: AppColors.diaperAccent,
+            foreground: CupertinoColors.white,
+            showCheck: _confirmed == 'poop',
+            onPressed: () => _onTap(EventType.diaperPoop),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiaperButton extends StatelessWidget {
   final String label;
   final Color background;
   final Color foreground;
-  final Color? border;
-  final Future<void> Function() onPressed;
-  const _BigButton({
+  final bool showCheck;
+  final VoidCallback onPressed;
+
+  const _DiaperButton({
     required this.label,
     required this.background,
     required this.foreground,
+    required this.showCheck,
     required this.onPressed,
-    this.border,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 54,
+      height: 40,
       child: CupertinoButton(
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         borderRadius: BorderRadius.circular(AppRadius.button),
         color: background,
-        onPressed: () => onPressed(),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            border: border != null
-                ? Border.all(color: border!, width: 1.4)
-                : null,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: AppText.headline.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+        onPressed: onPressed,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return ScaleTransition(scale: animation, child: child);
+          },
+          child: showCheck
+              ? Icon(
+                  CupertinoIcons.checkmark_alt,
+                  key: const ValueKey('check'),
+                  color: foreground,
+                  size: 20,
+                )
+              : Text(
+                  label,
+                  key: const ValueKey('label'),
+                  style: AppText.callout.copyWith(
+                    color: foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
         ),
       ),
     );
@@ -351,44 +656,118 @@ class _TodaySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final sleeps = daily?.sleepCount ?? 0;
     final feeds = daily?.feedCount ?? 0;
     final sleepTotal = daily?.sleepTotal ?? Duration.zero;
     final feedTotal = daily?.feedTotal ?? Duration.zero;
+    final pees = daily?.peeCount ?? 0;
+    final poops = daily?.poopCount ?? 0;
 
+    return Row(
+      children: [
+        Expanded(
+          child: _StatTile(
+            icon: CupertinoIcons.moon_fill,
+            accent: AppColors.sleepAccent,
+            softBg: AppColors.sleepSoft,
+            value: '$sleeps',
+            label: s.sleepPlural(sleeps),
+            detail: formatDuration(sleepTotal),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatTile(
+            icon: CupertinoIcons.drop_fill,
+            accent: AppColors.feedAccent,
+            softBg: AppColors.feedSoft,
+            value: '$feeds',
+            label: s.feedPlural(feeds),
+            detail: formatDuration(feedTotal),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatTile(
+            iconWidget: Center(
+              child: SvgPicture.asset(
+                'assets/icons/poop.svg',
+                width: 14,
+                height: 14,
+                colorFilter: const ColorFilter.mode(AppColors.diaperAccent, BlendMode.srcIn),
+              ),
+            ),
+            accent: AppColors.diaperAccent,
+            softBg: AppColors.diaperSoft,
+            value: '${pees + poops}',
+            label: s.diaperPlural(pees + poops),
+            detail: '$pees Pee  $poops Poo',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final IconData? icon;
+  final Widget? iconWidget;
+  final Color accent;
+  final Color softBg;
+  final String value;
+  final String label;
+  final String detail;
+  const _StatTile({
+    this.icon,
+    this.iconWidget,
+    required this.accent,
+    required this.softBg,
+    required this.value,
+    required this.label,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return SectionCard(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+      child: Column(
         children: [
-          Expanded(
-            child: _SummaryCell(
-              value: '$sleeps',
-              caption: 'Sleeps',
-              accent: AppColors.sleepAccent,
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: softBg,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: iconWidget ?? Icon(icon, color: accent, size: 15),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: AppText.title.copyWith(
+              fontSize: 24,
+              letterSpacing: -0.5,
+              color: accent,
             ),
           ),
-          const _CellDivider(),
-          Expanded(
-            child: _SummaryCell(
-              value: formatDuration(sleepTotal),
-              caption: 'Slept',
-              accent: AppColors.sleepAccent,
+          const SizedBox(height: 2),
+          Text(label, style: AppText.footnote),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: softBg,
+              borderRadius: BorderRadius.circular(6),
             ),
-          ),
-          const _CellDivider(),
-          Expanded(
-            child: _SummaryCell(
-              value: '$feeds',
-              caption: 'Feeds',
-              accent: AppColors.feedAccent,
-            ),
-          ),
-          const _CellDivider(),
-          Expanded(
-            child: _SummaryCell(
-              value: formatDuration(feedTotal),
-              caption: 'Fed',
-              accent: AppColors.feedAccent,
+            child: Text(
+              detail,
+              style: AppText.caption.copyWith(
+                color: accent,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
@@ -397,61 +776,22 @@ class _TodaySummary extends StatelessWidget {
   }
 }
 
-class _SummaryCell extends StatelessWidget {
-  final String value;
-  final String caption;
-  final Color accent;
-  const _SummaryCell({
-    required this.value,
-    required this.caption,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: AppText.title.copyWith(
-            fontSize: 20,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(caption, style: AppText.caption),
-      ],
-    );
-  }
-}
-
-class _CellDivider extends StatelessWidget {
-  const _CellDivider();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 0.5,
-      height: 30,
-      color: AppColors.divider,
-    );
-  }
-}
-
 class _RecentActivity extends StatelessWidget {
   final List<BabySession> sessions;
-  const _RecentActivity({required this.sessions});
+  final List<BabyEvent> diaperEvents;
+  const _RecentActivity({required this.sessions, required this.diaperEvents});
 
   @override
   Widget build(BuildContext context) {
-    final recent = sessions.reversed.take(5).toList();
+    final items = buildTimeline(sessions, diaperEvents);
+    final recent = items.take(5).toList();
     if (recent.isEmpty) {
       return SectionCard(
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
-              'Tap a button above to start tracking.',
+              S.of(context).emptyTracker,
               style: AppText.subhead,
             ),
           ),
@@ -463,7 +803,10 @@ class _RecentActivity extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < recent.length; i++) ...[
-            SessionRow(session: recent[i]),
+            recent[i].when(
+              session: (s) => SessionRow(session: s),
+              diaper: (e) => DiaperRow(event: e),
+            ),
             if (i < recent.length - 1)
               Container(
                 margin: const EdgeInsets.only(left: 60),
@@ -491,17 +834,20 @@ class SessionRow extends StatelessWidget {
     final softBg = isSleep ? AppColors.sleepSoft : AppColors.feedSoft;
     final icon = isSleep ? CupertinoIcons.moon_fill : CupertinoIcons.drop_fill;
 
+    final s = S.of(context);
     final ongoing = session.isOngoing;
+    final sl = !isSleep ? s.sideLabel(session.side) : '';
+    final sideTag = sl.isNotEmpty ? ' · $sl' : '';
     final title = ongoing
-        ? (isSleep ? 'Sleeping' : 'Feeding')
-        : (isSleep ? 'Slept' : 'Fed');
+        ? (isSleep ? s.sleeping : '${s.feeding}$sideTag')
+        : (isSleep ? s.slept : '${s.fed}$sideTag');
 
     final duration = ongoing
         ? DateTime.now().difference(session.start)
         : session.duration!;
 
     final rightText = ongoing
-        ? 'Since ${formatClock(session.start)}'
+        ? s.since(formatClock(session.start))
         : '${formatClock(session.start)} – ${formatClock(session.end!)}';
 
     final content = Padding(
@@ -552,6 +898,108 @@ class SessionRow extends StatelessWidget {
           ),
           Text(
             rightText,
+            style: AppText.subhead.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          if (onTap != null) ...[
+            const SizedBox(width: 6),
+            const Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: AppColors.textTertiary,
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (onTap == null) return content;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: onTap,
+      child: content,
+    );
+  }
+}
+
+class TimelineItem {
+  final DateTime timestamp;
+  final BabySession? _session;
+  final BabyEvent? _diaper;
+
+  TimelineItem.session(BabySession s)
+      : timestamp = s.start,
+        _session = s,
+        _diaper = null;
+
+  TimelineItem.diaper(BabyEvent e)
+      : timestamp = e.timestamp,
+        _session = null,
+        _diaper = e;
+
+  bool get isSession => _session != null;
+
+  Widget when({
+    required Widget Function(BabySession) session,
+    required Widget Function(BabyEvent) diaper,
+  }) {
+    if (_session != null) return session(_session);
+    return diaper(_diaper!);
+  }
+}
+
+List<TimelineItem> buildTimeline(
+  List<BabySession> sessions,
+  List<BabyEvent> diaperEvents,
+) {
+  final items = <TimelineItem>[
+    for (final s in sessions) TimelineItem.session(s),
+    for (final e in diaperEvents) TimelineItem.diaper(e),
+  ];
+  items.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  return items;
+}
+
+class DiaperRow extends StatelessWidget {
+  final BabyEvent event;
+  final VoidCallback? onTap;
+  const DiaperRow({super.key, required this.event, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final isPee = event.type == EventType.diaperPee;
+    final title = isPee ? s.pee : s.poop;
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.diaperSoft,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: isPee
+                ? Icon(CupertinoIcons.drop, color: AppColors.diaperAccent, size: 16)
+                : Center(
+                    child: SvgPicture.asset(
+                      'assets/icons/poop.svg',
+                      width: 15,
+                      height: 15,
+                      colorFilter: const ColorFilter.mode(AppColors.diaperAccent, BlendMode.srcIn),
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(title, style: AppText.callout),
+          ),
+          Text(
+            formatClock(event.timestamp),
             style: AppText.subhead.copyWith(
               fontFeatures: const [FontFeature.tabularFigures()],
             ),

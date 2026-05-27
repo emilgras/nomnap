@@ -11,9 +11,13 @@ class DailyStats {
   final DateTime day;
   int sleepCount = 0;
   int feedCount = 0;
+  int peeCount = 0;
+  int poopCount = 0;
   Duration sleepTotal = Duration.zero;
   Duration feedTotal = Duration.zero;
   DailyStats(this.day);
+
+  int get diaperCount => peeCount + poopCount;
 }
 
 class Statistics {
@@ -69,6 +73,16 @@ class Statistics {
       final stat = out.putIfAbsent(k, () => DailyStats(k));
       stat.feedCount++;
       stat.feedTotal += s.duration!;
+    }
+    for (final e in events) {
+      if (!e.type.isDiaper) continue;
+      final k = keyOf(e.timestamp);
+      final stat = out.putIfAbsent(k, () => DailyStats(k));
+      if (e.type == EventType.diaperPee) {
+        stat.peeCount++;
+      } else {
+        stat.poopCount++;
+      }
     }
     return out;
   }
@@ -133,6 +147,27 @@ class Statistics {
     return ds
         .map((s) => s.duration!)
         .reduce((a, b) => a > b ? a : b);
+  }
+
+  double get avgDiapersPerDay {
+    final days = dailyStats.where((d) => d.diaperCount > 0).toList();
+    if (days.isEmpty) return 0;
+    final total = days.fold<int>(0, (acc, d) => acc + d.diaperCount);
+    return total / days.length;
+  }
+
+  double get avgPeesPerDay {
+    final days = dailyStats.where((d) => d.peeCount > 0).toList();
+    if (days.isEmpty) return 0;
+    final total = days.fold<int>(0, (acc, d) => acc + d.peeCount);
+    return total / days.length;
+  }
+
+  double get avgPoopsPerDay {
+    final days = dailyStats.where((d) => d.poopCount > 0).toList();
+    if (days.isEmpty) return 0;
+    final total = days.fold<int>(0, (acc, d) => acc + d.poopCount);
+    return total / days.length;
   }
 
   DailyStats? statsForDay(DateTime day) {

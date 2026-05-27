@@ -50,11 +50,12 @@ class EventStore extends ChangeNotifier {
     _events.sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
-  Future<BabyEvent> add(EventType type, {DateTime? at}) async {
+  Future<BabyEvent> add(EventType type, {DateTime? at, Map<String, String>? meta}) async {
     final event = BabyEvent(
       id: _newId(),
       type: type,
       timestamp: at ?? DateTime.now(),
+      meta: meta,
     );
     _events.add(event);
     _sort();
@@ -78,6 +79,14 @@ class EventStore extends ChangeNotifier {
     await _persist();
   }
 
+  Future<void> updateMeta(String id, Map<String, String> meta) async {
+    final idx = _events.indexWhere((e) => e.id == id);
+    if (idx == -1) return;
+    _events[idx] = _events[idx].copyWith(meta: meta);
+    notifyListeners();
+    await _persist();
+  }
+
   /// Add a completed session (used by manual entry).
   /// Creates a start + end event pair atomically.
   Future<void> addSession({
@@ -85,11 +94,12 @@ class EventStore extends ChangeNotifier {
     required EventType endType,
     required DateTime start,
     required DateTime end,
+    Map<String, String>? startMeta,
   }) async {
     if (!end.isAfter(start)) {
       throw ArgumentError('End must be after start');
     }
-    _events.add(BabyEvent(id: _newId(), type: startType, timestamp: start));
+    _events.add(BabyEvent(id: _newId(), type: startType, timestamp: start, meta: startMeta));
     _events.add(BabyEvent(id: _newId(), type: endType, timestamp: end));
     _sort();
     notifyListeners();
@@ -134,8 +144,14 @@ class EventStore extends ChangeNotifier {
   DateTime? get feedStartedAt =>
       isFeeding ? lastOf(EventType.feedStart)?.timestamp : null;
 
-  /// All sessions (start/end pairs) derived from the event stream,
-  /// in chronological order. Ongoing sessions have a null end.
+  String? get feedSide {
+    if (!isFeeding) return null;
+    return lastOf(EventType.feedStart)?.meta?['side'];
+  }
+
+  List<BabyEvent> get diaperEvents =>
+      _events.where((e) => e.type.isDiaper).toList();
+
   List<BabySession> get sessions => BabySession.from(_events);
 
   Future<void> deleteSession(BabySession session) async {

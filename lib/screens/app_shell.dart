@@ -2,6 +2,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/event_store.dart';
 import '../theme/app_theme.dart';
 import 'history_screen.dart';
@@ -94,10 +95,10 @@ class _NavItem {
   const _NavItem(this.icon, this.label);
 }
 
-const List<_NavItem> _kNavItems = [
-  _NavItem(CupertinoIcons.house_fill, 'Track'),
-  _NavItem(CupertinoIcons.chart_bar_alt_fill, 'Stats'),
-  _NavItem(CupertinoIcons.clock_fill, 'History'),
+List<_NavItem> _navItems(S s) => [
+  _NavItem(CupertinoIcons.house_fill, s.navTrack),
+  _NavItem(CupertinoIcons.chart_bar_alt_fill, s.navStats),
+  _NavItem(CupertinoIcons.clock_fill, s.navHistory),
 ];
 
 class _FloatingPillNav extends StatelessWidget {
@@ -117,8 +118,7 @@ class _FloatingPillNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Outer DecoratedBox carries the shadow (outside the clip);
-    // inner ClipRRect clips the blur + solid background cleanly.
+    final items = _navItems(S.of(context));
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(_outerRadius),
@@ -142,21 +142,14 @@ class _FloatingPillNav extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
           child: Container(
             height: 58,
-            // Solid translucent white — the *menu* itself doesn't carry the
-            // gradient (the soft tinted backdrop in AppShell does that job).
             color: CupertinoColors.white.withValues(alpha: 0.82),
-            // Uniform 4px inset on all sides ⇒ leftmost/rightmost active pill
-            // curves are perfectly concentric with the outer container.
             padding: const EdgeInsets.all(_innerInset),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final slotWidth =
-                    constraints.maxWidth / _kNavItems.length;
+                    constraints.maxWidth / items.length;
                 return Stack(
                   children: [
-                    // Single sliding indicator — glides between slots so the
-                    // selection feels like one liquid pill, not three discrete
-                    // backgrounds flickering on/off.
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 320),
                       curve: Curves.easeOutCubic,
@@ -175,10 +168,10 @@ class _FloatingPillNav extends StatelessWidget {
                     ),
                     Row(
                       children: [
-                        for (var i = 0; i < _kNavItems.length; i++)
+                        for (var i = 0; i < items.length; i++)
                           Expanded(
                             child: _PillNavItem(
-                              item: _kNavItems[i],
+                              item: items[i],
                               active: currentIndex == i,
                               onTap: () => onChanged(i),
                             ),

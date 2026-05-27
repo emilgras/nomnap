@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum EventType { sleepStart, sleepEnd, feedStart, feedEnd }
+enum EventType { sleepStart, sleepEnd, feedStart, feedEnd, diaperPee, diaperPoop }
 
 extension EventTypeX on EventType {
   String get id {
@@ -13,8 +13,15 @@ extension EventTypeX on EventType {
         return 'feed_start';
       case EventType.feedEnd:
         return 'feed_end';
+      case EventType.diaperPee:
+        return 'diaper_pee';
+      case EventType.diaperPoop:
+        return 'diaper_poop';
     }
   }
+
+  bool get isDiaper =>
+      this == EventType.diaperPee || this == EventType.diaperPoop;
 
   static EventType fromId(String id) {
     return EventType.values.firstWhere((e) => e.id == id);
@@ -25,14 +32,21 @@ class BabyEvent {
   final String id;
   final EventType type;
   final DateTime timestamp;
+  final Map<String, String>? meta;
 
-  BabyEvent({required this.id, required this.type, required this.timestamp});
+  BabyEvent({
+    required this.id,
+    required this.type,
+    required this.timestamp,
+    this.meta,
+  });
 
-  BabyEvent copyWith({DateTime? timestamp}) {
+  BabyEvent copyWith({DateTime? timestamp, Map<String, String>? meta}) {
     return BabyEvent(
       id: id,
       type: type,
       timestamp: timestamp ?? this.timestamp,
+      meta: meta ?? this.meta,
     );
   }
 
@@ -40,12 +54,16 @@ class BabyEvent {
         'id': id,
         'type': type.id,
         'ts': timestamp.toUtc().toIso8601String(),
+        if (meta != null && meta!.isNotEmpty) 'meta': meta,
       };
 
   factory BabyEvent.fromJson(Map<String, dynamic> json) => BabyEvent(
         id: json['id'] as String,
         type: EventTypeX.fromId(json['type'] as String),
         timestamp: DateTime.parse(json['ts'] as String).toLocal(),
+        meta: (json['meta'] as Map<String, dynamic>?)?.map(
+          (k, v) => MapEntry(k, v as String),
+        ),
       );
 
   static String encodeList(List<BabyEvent> events) =>

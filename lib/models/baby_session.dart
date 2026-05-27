@@ -17,6 +17,7 @@ class BabySession {
   final String? endEventId;
   final DateTime start;
   final DateTime? end;
+  final String? side;
 
   BabySession({
     required this.kind,
@@ -24,6 +25,7 @@ class BabySession {
     required this.start,
     this.endEventId,
     this.end,
+    this.side,
   });
 
   bool get isOngoing => end == null;
@@ -68,6 +70,7 @@ class BabySession {
               kind: SessionKind.feed,
               startEventId: openFeed.id,
               start: openFeed.timestamp,
+              side: openFeed.meta?['side'],
             ));
           }
           openFeed = e;
@@ -80,9 +83,13 @@ class BabySession {
               endEventId: e.id,
               start: openFeed.timestamp,
               end: e.timestamp,
+              side: openFeed.meta?['side'],
             ));
             openFeed = null;
           }
+          break;
+        case EventType.diaperPee:
+        case EventType.diaperPoop:
           break;
       }
     }
@@ -98,6 +105,7 @@ class BabySession {
         kind: SessionKind.feed,
         startEventId: openFeed.id,
         start: openFeed.timestamp,
+        side: openFeed.meta?['side'],
       ));
     }
     result.sort((a, b) => a.start.compareTo(b.start));

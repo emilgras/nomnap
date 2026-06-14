@@ -1,5 +1,5 @@
-name: babytrack
-description: "BabyTrack - A simple, elegant baby sleep & feed tracker."
+name: nomnap
+description: "NomNap - A simple, elegant baby sleep & feed tracker."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -40,6 +40,9 @@ dependencies:
   intl: ^0.20.2
   flutter_svg: ^2.0.10
   web: ^1.1.1
+  share_plus: ">=10.0.1 <11.0.0"
+  file_picker: 11.0.0
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

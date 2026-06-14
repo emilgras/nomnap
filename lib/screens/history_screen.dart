@@ -49,7 +49,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _exportData() async {
     final json = widget.store.exportJson();
     final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    await file_io.downloadFile('nomnap_backup_$date.json', json);
+    // Anchor the iOS/iPad share popover at the originating button/screen.
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box != null && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    await file_io.downloadFile(
+      'nomnap_backup_$date.json',
+      json,
+      sharePositionOrigin: origin,
+    );
   }
 
   Future<void> _importData() async {

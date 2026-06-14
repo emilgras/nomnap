@@ -1,9 +1,14 @@
 import 'dart:async';
 import 'dart:js_interop';
+import 'dart:ui';
 
 import 'package:web/web.dart' as web;
 
-Future<void> downloadFile(String filename, String content) async {
+Future<void> downloadFile(
+  String filename,
+  String content, {
+  Rect? sharePositionOrigin,
+}) async {
   final blob = web.Blob(
     [content.toJS].toJS,
     web.BlobPropertyBag(type: 'application/json'),

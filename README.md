@@ -48,30 +48,36 @@ flutter run -d chrome        # web smoke test
 
 ## Shipping to Google Play (Android)
 
-The code is ready. You just need the Android toolchain locally.
+App identity, release signing, and the build config are **already done**:
+
+- **Application ID**: `com.nomnap.app` (set in `android/app/build.gradle.kts` and the
+  iOS project; the Dart package is `nomnap`).
+- **Upload keystore**: `android/app/upload-keystore.jks` (gitignored), wired up via
+  `android/key.properties` (gitignored). `build.gradle.kts` loads it automatically for
+  release builds and falls back to debug signing when the file is absent.
+
+> ⚠️ **Back up the keystore + password.** `android/app/upload-keystore.jks` and the
+> password in `android/key.properties` are the *only* way to publish future updates to
+> this app. If you lose them you can never update the app again. Copy both into a
+> password manager / secure backup now. They are gitignored on purpose, so they are
+> **not** in version control.
+
+What's left is local tooling + the build, which need the Android SDK:
 
 1. **Install Android Studio** → https://developer.android.com/studio
    On first launch it installs the Android SDK. Then run `flutter doctor --android-licenses` and accept all licenses.
 2. **Confirm setup**: `flutter doctor` should show a green check for "Android toolchain".
-3. **Generate a release keystore** (one-time):
-   ```bash
-   keytool -genkey -v -keystore %USERPROFILE%\babytrack-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
-   ```
-4. **Wire the keystore** — create `android/key.properties`:
-   ```
-   storePassword=...
-   keyPassword=...
-   keyAlias=upload
-   storeFile=C:/Users/egr/babytrack-upload.jks
-   ```
-   And edit `android/app/build.gradle.kts` to load it. Flutter's docs walk through this: https://docs.flutter.dev/deployment/android#signing-the-app
-5. **Build the App Bundle** (the format Google Play wants):
+3. **Build the App Bundle** (the format Google Play wants):
    ```bash
    flutter build appbundle --release
    ```
    Output: `build/app/outputs/bundle/release/app-release.aab` — upload this to the Play Console.
+4. **Create a Play Console account** ($25 one-time), complete the store listing, content
+   rating, and Data safety form (declare: no data collected/shared — see the privacy
+   policy), then upload the `.aab`.
 
-Bundle ID is currently `com.babytrack.babytrack` (the project's original internal name; only Dart code and bundle ids still carry it — user-facing branding is NomNap). Change it in `android/app/build.gradle.kts` (`applicationId`) before your first Play submission if you want a `com.nomnap.*` identifier.
+**Privacy policy** (required by both stores) is published at
+https://emilgras.github.io/nomnap/privacy.html (source: [docs/privacy.html](docs/privacy.html)).
 
 ## Shipping to the App Store (iOS)
 

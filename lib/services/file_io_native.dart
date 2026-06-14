@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -31,20 +30,13 @@ Future<void> downloadFile(
 /// Opens the system file picker for a JSON file and returns its text contents,
 /// or null if the user cancels.
 Future<String?> pickAndReadFile() async {
-  final result = await FilePicker.pickFiles(
-    type: FileType.custom,
-    allowedExtensions: ['json'],
-    withData: true,
+  const typeGroup = XTypeGroup(
+    label: 'JSON',
+    extensions: ['json'],
+    mimeTypes: ['application/json'],
+    uniformTypeIdentifiers: ['public.json'],
   );
-  if (result == null || result.files.isEmpty) return null;
-
-  final picked = result.files.single;
-  final bytes = picked.bytes;
-  if (bytes != null) return utf8.decode(bytes);
-
-  // Fall back to reading from the path if bytes weren't loaded.
-  final path = picked.path;
-  if (path != null) return File(path).readAsString();
-
-  return null;
+  final file = await openFile(acceptedTypeGroups: [typeGroup]);
+  if (file == null) return null;
+  return file.readAsString();
 }

@@ -1,6 +1,15 @@
 import 'dart:convert';
 
-enum EventType { sleepStart, sleepEnd, feedStart, feedEnd, diaperPee, diaperPoop }
+enum EventType {
+  sleepStart,
+  sleepEnd,
+  feedStart,
+  feedEnd,
+  feedBottle,
+  feedTube,
+  diaperPee,
+  diaperPoop,
+}
 
 extension EventTypeX on EventType {
   String get id {
@@ -13,6 +22,10 @@ extension EventTypeX on EventType {
         return 'feed_start';
       case EventType.feedEnd:
         return 'feed_end';
+      case EventType.feedBottle:
+        return 'feed_bottle';
+      case EventType.feedTube:
+        return 'feed_tube';
       case EventType.diaperPee:
         return 'diaper_pee';
       case EventType.diaperPoop:
@@ -22,6 +35,13 @@ extension EventTypeX on EventType {
 
   bool get isDiaper =>
       this == EventType.diaperPee || this == EventType.diaperPoop;
+
+  /// Instant (non-session) feed events: bottle and tube.
+  bool get isInstantFeed =>
+      this == EventType.feedBottle || this == EventType.feedTube;
+
+  /// Point-in-time events that show as single timeline rows (not sessions).
+  bool get isPointEvent => isDiaper || isInstantFeed;
 
   static EventType fromId(String id) {
     return EventType.values.firstWhere((e) => e.id == id);

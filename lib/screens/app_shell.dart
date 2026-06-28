@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../services/event_store.dart';
 import '../theme/app_theme.dart';
 import 'history_screen.dart';
+import 'profile_screen.dart';
 import 'stats_screen.dart';
 import 'tracker_screen.dart';
 
@@ -38,6 +39,7 @@ class _AppShellState extends State<AppShell> {
               TrackerScreen(store: widget.store),
               StatsScreen(store: widget.store),
               HistoryScreen(store: widget.store),
+              ProfileScreen(store: widget.store),
             ],
           ),
           // Soft gradient backdrop *behind* the floating pill — gives the
@@ -72,9 +74,9 @@ class _AppShellState extends State<AppShell> {
             // Side padding still gives breathing room on small screens.
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 340),
+                constraints: const BoxConstraints(maxWidth: 380),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: _FloatingPillNav(
                     currentIndex: _index,
                     onChanged: (i) => setState(() => _index = i),
@@ -99,6 +101,7 @@ List<_NavItem> _navItems(S s) => [
   _NavItem(CupertinoIcons.house_fill, s.navTrack),
   _NavItem(CupertinoIcons.chart_bar_alt_fill, s.navStats),
   _NavItem(CupertinoIcons.clock_fill, s.navHistory),
+  _NavItem(CupertinoIcons.person_fill, s.navProfile),
 ];
 
 class _FloatingPillNav extends StatelessWidget {

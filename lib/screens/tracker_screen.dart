@@ -5,19 +5,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../l10n/app_localizations.dart';
-import '../l10n/locale_provider.dart';
 import '../widgets/sticky_header.dart';
 import '../widgets/wakeup_refresh.dart';
 
 import '../models/baby_event.dart';
 import '../models/baby_session.dart';
+import '../models/tracker_kind.dart';
 import '../services/event_store.dart';
+import '../services/home_config.dart';
 import '../services/statistics.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_icons.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
 import 'add_entry_sheet.dart';
 import 'app_shell.dart' show kFloatingNavReserve;
+import 'customize_home_sheet.dart';
+import 'feed_amount_sheet.dart';
 
 class TrackerScreen extends StatefulWidget {
   final EventStore store;
@@ -65,19 +69,144 @@ class _TrackerScreenState extends State<TrackerScreen> {
     unawaited(HapticFeedback.mediumImpact());
   }
 
-  Future<void> _logDiaper(EventType type) async {
-    await widget.store.add(type);
+  Future<void> _logDiaper(EventType type, {String? size}) async {
+    await widget.store.add(
+      type,
+      meta: size != null ? {'size': size} : null,
+    );
     unawaited(HapticFeedback.mediumImpact());
+  }
+
+  Future<void> _logQuickFeed(EventType type, {String? amount}) async {
+    await widget.store.add(
+      type,
+      meta: amount != null ? {'amount': amount} : null,
+    );
+    unawaited(HapticFeedback.mediumImpact());
+  }
+
+  /// Builds the enabled tracker cards in configured order, with 12px gaps.
+  /// Shows an empty-state hint (with a Customize shortcut) when none are on.
+  List<Widget> _buildTrackerCards(BuildContext context, HomeConfig config) {
+    final kinds = config.enabledInOrder;
+    if (kinds.isEmpty) {
+      return [
+        SectionCard(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  S.of(context).noTrackersHint,
+                  textAlign: TextAlign.center,
+                  style: AppText.subhead,
+                ),
+              ),
+              CupertinoButton(
+                onPressed: () => CustomizeHomeSheet.show(context, config),
+                child: Text(S.of(context).customize),
+              ),
+            ],
+          ),
+        ),
+      ];
+    }
+    final cards = <Widget>[];
+    for (var i = 0; i < kinds.length; i++) {
+      if (i > 0) cards.add(const SizedBox(height: 12));
+      cards.add(_cardFor(context, config, kinds[i]));
+    }
+    return cards;
+  }
+
+  /// "Last X ago" subtitle for an idle card, or null if that type has no
+  /// history yet (caller falls back to the static label).
+  String? _lastAgo(EventType type, String Function(String) label) {
+    final at = widget.store.lastOf(type)?.timestamp;
+    if (at == null) return null;
+    return label(S.of(context).relativeTimeAgo(at));
+  }
+
+  Widget _cardFor(BuildContext context, HomeConfig config, TrackerKind kind) {
+    final store = widget.store;
+    final s = S.of(context);
+    switch (kind) {
+      case TrackerKind.sleep:
+        return _ActionCard(
+          title: s.sleep,
+          active: store.isSleeping,
+          startedAt: store.sleepStartedAt,
+          accent: AppColors.sleepAccent,
+          softBg: AppColors.sleepSoft,
+          icon: CupertinoIcons.moon_fill,
+          activeLabel: s.sleeping,
+          inactiveLabel: s.awake,
+          idleDetail: _lastAgo(EventType.sleepEnd, s.lastSlept),
+          buttonStart: s.startSleep,
+          buttonStop: s.wakeUp,
+          onToggle: _toggleSleep,
+        );
+      case TrackerKind.feed:
+        return _FeedCard(
+          active: store.isFeeding,
+          startedAt: store.feedStartedAt,
+          side: store.feedSide,
+          idleDetail: _lastAgo(EventType.feedEnd, s.lastFed),
+          onStart: _startFeed,
+          onStop: _stopFeed,
+        );
+      case TrackerKind.bottle:
+        return _QuickFeedCard(
+          title: s.bottle,
+          icon: const BottleIcon(color: AppColors.bottleAccent, size: 22),
+          accent: AppColors.bottleAccent,
+          softBg: AppColors.bottleSoft,
+          trackAmount: config.optionBool(kind, 'trackAmount', fallback: true),
+          idleDetail: _lastAgo(EventType.feedBottle, s.lastAgo),
+          onLog: (amount) =>
+              _logQuickFeed(EventType.feedBottle, amount: amount),
+        );
+      case TrackerKind.tube:
+        return _QuickFeedCard(
+          title: s.tube,
+          icon: const TubeIcon(color: AppColors.tubeAccent, size: 22),
+          accent: AppColors.tubeAccent,
+          softBg: AppColors.tubeSoft,
+          trackAmount: config.optionBool(kind, 'trackAmount', fallback: true),
+          idleDetail: _lastAgo(EventType.feedTube, s.lastAgo),
+          onLog: (amount) => _logQuickFeed(EventType.feedTube, amount: amount),
+        );
+      case TrackerKind.diaper:
+        final parts = [
+          _lastAgo(EventType.diaperPee, s.lastPee),
+          _lastAgo(EventType.diaperPoop, s.lastPoo),
+        ].whereType<String>().toList();
+        return _DiaperCard(
+          trackSize: config.optionBool(kind, 'trackSize', fallback: false),
+          idleDetail: parts.isEmpty ? null : parts.join('  ·  '),
+          onLog: _logDiaper,
+        );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
-    final isSleeping = store.isSleeping;
-    final isFeeding = store.isFeeding;
+    final config = HomeConfigScope.of(context);
 
-    final stats = Statistics(store.events);
+    final stats = Statistics(store.events, dayStartHour: config.dayStartHour);
     final today = stats.statsForDay(DateTime.now());
+
+    // TODAY tiles mirror what's enabled on the home page: a feed tile shows if
+    // any feed-type tracker (breast/bottle/tube) is on. Hide the whole section
+    // when nothing relevant is enabled.
+    final enabled = config.enabledInOrder.toSet();
+    final showSleep = enabled.contains(TrackerKind.sleep);
+    final showFeed = enabled.contains(TrackerKind.feed) ||
+        enabled.contains(TrackerKind.bottle) ||
+        enabled.contains(TrackerKind.tube);
+    final showDiaper = enabled.contains(TrackerKind.diaper);
+    final showToday = showSleep || showFeed || showDiaper;
 
     final topInset = MediaQuery.of(context).padding.top;
     return CupertinoPageScaffold(
@@ -116,21 +245,11 @@ class _TrackerScreenState extends State<TrackerScreen> {
                   CupertinoButton(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(44, 44),
-                    onPressed: () => LocaleScope.of(context).toggle(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.sleepSoft,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        S.of(context).localeCode.toUpperCase(),
-                        style: AppText.caption.copyWith(
-                          color: AppColors.sleepAccent,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                    onPressed: () => CustomizeHomeSheet.show(context, config),
+                    child: const Icon(
+                      CupertinoIcons.slider_horizontal_3,
+                      color: AppColors.sleepAccent,
+                      size: 26,
                     ),
                   ),
                   CupertinoButton(
@@ -171,37 +290,22 @@ class _TrackerScreenState extends State<TrackerScreen> {
             ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _ActionCard(
-                  title: S.of(context).sleep,
-                  active: isSleeping,
-                  startedAt: store.sleepStartedAt,
-                  accent: AppColors.sleepAccent,
-                  softBg: AppColors.sleepSoft,
-                  icon: CupertinoIcons.moon_fill,
-                  activeLabel: S.of(context).sleeping,
-                  inactiveLabel: S.of(context).awake,
-                  buttonStart: S.of(context).startSleep,
-                  buttonStop: S.of(context).wakeUp,
-                  onToggle: _toggleSleep,
-                ),
-                const SizedBox(height: 12),
-                _FeedCard(
-                  active: isFeeding,
-                  startedAt: store.feedStartedAt,
-                  side: store.feedSide,
-                  onStart: _startFeed,
-                  onStop: _stopFeed,
-                ),
-                const SizedBox(height: 12),
-                _DiaperCard(onLog: _logDiaper),
-                const SizedBox(height: 28),
-                SectionHeader(S.of(context).today),
-                _TodaySummary(daily: today),
+                ..._buildTrackerCards(context, config),
+                if (showToday) ...[
+                  const SizedBox(height: 28),
+                  SectionHeader(S.of(context).today),
+                  _TodaySummary(
+                    daily: today,
+                    showSleep: showSleep,
+                    showFeed: showFeed,
+                    showDiaper: showDiaper,
+                  ),
+                ],
                 const SizedBox(height: 28),
                 SectionHeader(S.of(context).recentActivity),
                 _RecentActivity(
                   sessions: store.sessions,
-                  diaperEvents: store.diaperEvents,
+                  pointEvents: store.pointEvents,
                 ),
               ]),
             ),
@@ -221,6 +325,7 @@ class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String activeLabel;
   final String inactiveLabel;
+  final String? idleDetail;
   final String buttonStart;
   final String buttonStop;
   final Future<void> Function() onToggle;
@@ -234,6 +339,7 @@ class _ActionCard extends StatelessWidget {
     required this.icon,
     required this.activeLabel,
     required this.inactiveLabel,
+    this.idleDetail,
     required this.buttonStart,
     required this.buttonStop,
     required this.onToggle,
@@ -269,7 +375,7 @@ class _ActionCard extends StatelessWidget {
                     Text(title, style: AppText.headline),
                     const SizedBox(height: 2),
                     Text(
-                      active ? activeLabel : inactiveLabel,
+                      active ? activeLabel : (idleDetail ?? inactiveLabel),
                       style: AppText.footnote.copyWith(
                         color: active ? accent : AppColors.textSecondary,
                         fontWeight: active ? FontWeight.w500 : FontWeight.w400,
@@ -353,6 +459,7 @@ class _FeedCard extends StatelessWidget {
   final bool active;
   final DateTime? startedAt;
   final String? side;
+  final String? idleDetail;
   final Future<void> Function(String side) onStart;
   final Future<void> Function() onStop;
 
@@ -360,6 +467,7 @@ class _FeedCard extends StatelessWidget {
     required this.active,
     required this.startedAt,
     required this.side,
+    this.idleDetail,
     required this.onStart,
     required this.onStop,
   });
@@ -401,7 +509,7 @@ class _FeedCard extends StatelessWidget {
                           ? (sl.isNotEmpty
                               ? '${s.feeding} · $sl'
                               : s.feeding)
-                          : s.notFeeding,
+                          : (idleDetail ?? s.notFeeding),
                       style: AppText.footnote.copyWith(
                         color: active
                             ? AppColors.feedAccent
@@ -525,8 +633,14 @@ class _FeedCard extends StatelessWidget {
 }
 
 class _DiaperCard extends StatefulWidget {
-  final Future<void> Function(EventType) onLog;
-  const _DiaperCard({required this.onLog});
+  final bool trackSize;
+  final String? idleDetail;
+  final Future<void> Function(EventType, {String? size}) onLog;
+  const _DiaperCard({
+    required this.trackSize,
+    this.idleDetail,
+    required this.onLog,
+  });
 
   @override
   State<_DiaperCard> createState() => _DiaperCardState();
@@ -537,10 +651,37 @@ class _DiaperCardState extends State<_DiaperCard> {
   String? _confirmed;
 
   Future<void> _onTap(EventType type) async {
+    String? size;
+    if (widget.trackSize) {
+      size = await _pickSize(type);
+      if (size == null) return; // cancelled
+    }
     setState(() => _confirmed = type == EventType.diaperPee ? 'pee' : 'poop');
-    await widget.onLog(type);
+    await widget.onLog(type, size: size);
     await Future.delayed(const Duration(milliseconds: 600));
     if (mounted) setState(() => _confirmed = null);
+  }
+
+  Future<String?> _pickSize(EventType type) {
+    final s = S.of(context);
+    return showCupertinoModalPopup<String>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text(s.diaperSize),
+        actions: [
+          for (final size in const ['S', 'M', 'L'])
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop(size),
+              child: Text(s.sizeLabel(size)),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text(s.cancel),
+        ),
+      ),
+    );
   }
 
   @override
@@ -572,7 +713,12 @@ class _DiaperCardState extends State<_DiaperCard> {
               children: [
                 Text(S.of(context).diaper, style: AppText.headline),
                 const SizedBox(height: 1),
-                Text(S.of(context).logAChange, style: AppText.footnote),
+                Text(
+                  widget.idleDetail ?? S.of(context).logAChange,
+                  style: AppText.footnote,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -650,9 +796,126 @@ class _DiaperButton extends StatelessWidget {
   }
 }
 
+/// A one-tap feed card (bottle / tube). Logs instantly; when [trackAmount]
+/// is on, first prompts for an amount in ml. Shows a brief checkmark on log.
+class _QuickFeedCard extends StatefulWidget {
+  final String title;
+  final Widget icon;
+  final Color accent;
+  final Color softBg;
+  final bool trackAmount;
+  final String? idleDetail;
+  final Future<void> Function(String? amount) onLog;
+
+  const _QuickFeedCard({
+    required this.title,
+    required this.icon,
+    required this.accent,
+    required this.softBg,
+    required this.trackAmount,
+    this.idleDetail,
+    required this.onLog,
+  });
+
+  @override
+  State<_QuickFeedCard> createState() => _QuickFeedCardState();
+}
+
+class _QuickFeedCardState extends State<_QuickFeedCard> {
+  bool _confirmed = false;
+
+  Future<void> _onTap() async {
+    String? amount;
+    if (widget.trackAmount) {
+      amount = await FeedAmountSheet.show(context, accent: widget.accent);
+      if (amount == null) return; // cancelled
+    }
+    setState(() => _confirmed = true);
+    await widget.onLog(amount);
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) setState(() => _confirmed = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: widget.softBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(child: widget.icon),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.title, style: AppText.headline),
+                const SizedBox(height: 1),
+                Text(
+                  widget.idleDetail ?? S.of(context).tapToLog,
+                  style: AppText.footnote,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            height: 40,
+            child: CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              color: widget.accent,
+              onPressed: _onTap,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) =>
+                    ScaleTransition(scale: animation, child: child),
+                child: _confirmed
+                    ? const Icon(
+                        CupertinoIcons.checkmark_alt,
+                        key: ValueKey('check'),
+                        color: CupertinoColors.white,
+                        size: 20,
+                      )
+                    : Text(
+                        S.of(context).logFeed,
+                        key: const ValueKey('label'),
+                        style: AppText.callout.copyWith(
+                          color: CupertinoColors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TodaySummary extends StatelessWidget {
   final DailyStats? daily;
-  const _TodaySummary({required this.daily});
+  final bool showSleep;
+  final bool showFeed;
+  final bool showDiaper;
+  const _TodaySummary({
+    required this.daily,
+    required this.showSleep,
+    required this.showFeed,
+    required this.showDiaper,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -664,47 +927,49 @@ class _TodaySummary extends StatelessWidget {
     final pees = daily?.peeCount ?? 0;
     final poops = daily?.poopCount ?? 0;
 
+    final tiles = <Widget>[
+      if (showSleep)
+        _StatTile(
+          icon: CupertinoIcons.moon_fill,
+          accent: AppColors.sleepAccent,
+          softBg: AppColors.sleepSoft,
+          value: '$sleeps',
+          label: s.sleepPlural(sleeps),
+          detail: formatDuration(sleepTotal),
+        ),
+      if (showFeed)
+        _StatTile(
+          icon: CupertinoIcons.drop_fill,
+          accent: AppColors.feedAccent,
+          softBg: AppColors.feedSoft,
+          value: '$feeds',
+          label: s.feedPlural(feeds),
+          detail: formatDuration(feedTotal),
+        ),
+      if (showDiaper)
+        _StatTile(
+          iconWidget: Center(
+            child: SvgPicture.asset(
+              'assets/icons/poop.svg',
+              width: 14,
+              height: 14,
+              colorFilter: const ColorFilter.mode(AppColors.diaperAccent, BlendMode.srcIn),
+            ),
+          ),
+          accent: AppColors.diaperAccent,
+          softBg: AppColors.diaperSoft,
+          value: '${pees + poops}',
+          label: s.diaperPlural(pees + poops),
+          detail: '$pees Pee  $poops Poo',
+        ),
+    ];
+
     return Row(
       children: [
-        Expanded(
-          child: _StatTile(
-            icon: CupertinoIcons.moon_fill,
-            accent: AppColors.sleepAccent,
-            softBg: AppColors.sleepSoft,
-            value: '$sleeps',
-            label: s.sleepPlural(sleeps),
-            detail: formatDuration(sleepTotal),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatTile(
-            icon: CupertinoIcons.drop_fill,
-            accent: AppColors.feedAccent,
-            softBg: AppColors.feedSoft,
-            value: '$feeds',
-            label: s.feedPlural(feeds),
-            detail: formatDuration(feedTotal),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatTile(
-            iconWidget: Center(
-              child: SvgPicture.asset(
-                'assets/icons/poop.svg',
-                width: 14,
-                height: 14,
-                colorFilter: const ColorFilter.mode(AppColors.diaperAccent, BlendMode.srcIn),
-              ),
-            ),
-            accent: AppColors.diaperAccent,
-            softBg: AppColors.diaperSoft,
-            value: '${pees + poops}',
-            label: s.diaperPlural(pees + poops),
-            detail: '$pees Pee  $poops Poo',
-          ),
-        ),
+        for (var i = 0; i < tiles.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(child: tiles[i]),
+        ],
       ],
     );
   }
@@ -778,12 +1043,12 @@ class _StatTile extends StatelessWidget {
 
 class _RecentActivity extends StatelessWidget {
   final List<BabySession> sessions;
-  final List<BabyEvent> diaperEvents;
-  const _RecentActivity({required this.sessions, required this.diaperEvents});
+  final List<BabyEvent> pointEvents;
+  const _RecentActivity({required this.sessions, required this.pointEvents});
 
   @override
   Widget build(BuildContext context) {
-    final items = buildTimeline(sessions, diaperEvents);
+    final items = buildTimeline(sessions, pointEvents);
     final recent = items.take(5).toList();
     if (recent.isEmpty) {
       return SectionCard(
@@ -805,7 +1070,7 @@ class _RecentActivity extends StatelessWidget {
           for (var i = 0; i < recent.length; i++) ...[
             recent[i].when(
               session: (s) => SessionRow(session: s),
-              diaper: (e) => DiaperRow(event: e),
+              point: (e) => buildPointRow(e),
             ),
             if (i < recent.length - 1)
               Container(
@@ -926,39 +1191,47 @@ class SessionRow extends StatelessWidget {
 class TimelineItem {
   final DateTime timestamp;
   final BabySession? _session;
-  final BabyEvent? _diaper;
+  final BabyEvent? _point;
 
   TimelineItem.session(BabySession s)
       : timestamp = s.start,
         _session = s,
-        _diaper = null;
+        _point = null;
 
-  TimelineItem.diaper(BabyEvent e)
+  TimelineItem.point(BabyEvent e)
       : timestamp = e.timestamp,
         _session = null,
-        _diaper = e;
+        _point = e;
 
   bool get isSession => _session != null;
 
   Widget when({
     required Widget Function(BabySession) session,
-    required Widget Function(BabyEvent) diaper,
+    required Widget Function(BabyEvent) point,
   }) {
     if (_session != null) return session(_session);
-    return diaper(_diaper!);
+    return point(_point!);
   }
 }
 
 List<TimelineItem> buildTimeline(
   List<BabySession> sessions,
-  List<BabyEvent> diaperEvents,
+  List<BabyEvent> pointEvents,
 ) {
   final items = <TimelineItem>[
     for (final s in sessions) TimelineItem.session(s),
-    for (final e in diaperEvents) TimelineItem.diaper(e),
+    for (final e in pointEvents) TimelineItem.point(e),
   ];
   items.sort((a, b) => b.timestamp.compareTo(a.timestamp));
   return items;
+}
+
+/// Renders a point event row: a diaper row or a bottle/tube feed row.
+Widget buildPointRow(BabyEvent event, {VoidCallback? onTap}) {
+  if (event.type.isInstantFeed) {
+    return FeedPointRow(event: event, onTap: onTap);
+  }
+  return DiaperRow(event: event, onTap: onTap);
 }
 
 class DiaperRow extends StatelessWidget {
@@ -971,6 +1244,7 @@ class DiaperRow extends StatelessWidget {
     final s = S.of(context);
     final isPee = event.type == EventType.diaperPee;
     final title = isPee ? s.pee : s.poop;
+    final sizeLabel = s.sizeLabel(event.meta?['size']);
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -996,7 +1270,19 @@ class DiaperRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(title, style: AppText.callout),
+            child: Row(
+              children: [
+                Flexible(child: Text(title, style: AppText.callout)),
+                if (sizeLabel.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _MetaBadge(
+                    text: sizeLabel,
+                    accent: AppColors.diaperAccent,
+                    softBg: AppColors.diaperSoft,
+                  ),
+                ],
+              ],
+            ),
           ),
           Text(
             formatClock(event.timestamp),
@@ -1021,6 +1307,110 @@ class DiaperRow extends StatelessWidget {
       padding: EdgeInsets.zero,
       onPressed: onTap,
       child: content,
+    );
+  }
+}
+
+/// One row representing an instant feed (bottle or tube), with optional amount.
+class FeedPointRow extends StatelessWidget {
+  final BabyEvent event;
+  final VoidCallback? onTap;
+  const FeedPointRow({super.key, required this.event, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final isBottle = event.type == EventType.feedBottle;
+    final accent = isBottle ? AppColors.bottleAccent : AppColors.tubeAccent;
+    final softBg = isBottle ? AppColors.bottleSoft : AppColors.tubeSoft;
+    final icon = isBottle
+        ? const BottleIcon(color: AppColors.bottleAccent, size: 18)
+        : const TubeIcon(color: AppColors.tubeAccent, size: 18);
+    final title = isBottle ? s.bottle : s.tube;
+    final amount = event.meta?['amount'];
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: softBg,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Center(child: icon),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(child: Text(title, style: AppText.callout)),
+                if (amount != null && amount.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _MetaBadge(
+                    text: s.amountMl(amount),
+                    accent: accent,
+                    softBg: softBg,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Text(
+            formatClock(event.timestamp),
+            style: AppText.subhead.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          if (onTap != null) ...[
+            const SizedBox(width: 6),
+            const Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: AppColors.textTertiary,
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (onTap == null) return content;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: onTap,
+      child: content,
+    );
+  }
+}
+
+/// Small pill badge for inline metadata (diaper size, feed amount).
+class _MetaBadge extends StatelessWidget {
+  final String text;
+  final Color accent;
+  final Color softBg;
+  const _MetaBadge({
+    required this.text,
+    required this.accent,
+    required this.softBg,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: softBg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: AppText.caption.copyWith(
+          color: accent,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

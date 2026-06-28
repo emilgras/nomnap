@@ -21,11 +21,6 @@ class LocaleProvider extends ChangeNotifier {
     await prefs.setString(_key, locale.languageCode);
   }
 
-  void toggle() {
-    setLocale(
-      _locale.languageCode == 'en' ? const Locale('da') : const Locale('en'),
-    );
-  }
 }
 
 class LocaleScope extends InheritedNotifier<LocaleProvider> {

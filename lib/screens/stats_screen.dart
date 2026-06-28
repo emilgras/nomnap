@@ -3,8 +3,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/event_store.dart';
+import '../services/home_config.dart';
 import '../services/statistics.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_icons.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
 import '../widgets/sticky_header.dart';
@@ -36,7 +38,10 @@ class _StatsScreenState extends State<StatsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final stats = Statistics(widget.store.events);
+    final stats = Statistics(
+      widget.store.events,
+      dayStartHour: HomeConfigScope.of(context).dayStartHour,
+    );
     final daily = stats.dailyStats;
     final hasData = daily.isNotEmpty;
 
@@ -80,6 +85,10 @@ class _StatsScreenState extends State<StatsScreen> {
                   _AvgGrid(stats: stats),
                   const SizedBox(height: 12),
                   _DiaperAvgTile(stats: stats),
+                  if (stats.hasSupplementalFeeds) ...[
+                    const SizedBox(height: 12),
+                    _VolumeTile(stats: stats),
+                  ],
                   const SizedBox(height: 24),
                   SectionHeader(S.of(context).sessionAverages),
                   SectionCard(
@@ -254,6 +263,69 @@ class _DiaperAvgTile extends StatelessWidget {
   }
 }
 
+/// Bottle + tube summary. Shown only when supplemental feeds exist. Headline is
+/// the all-feeds-per-day figure; the sub-line breaks out volume by Flaske/Sonde
+/// (or, if amounts aren't tracked, per-day counts).
+class _VolumeTile extends StatelessWidget {
+  final Statistics stats;
+  const _VolumeTile({required this.stats});
+
+  String _sub(S s) {
+    final days = stats.dailyStats;
+    final b = stats.avgDailyBottleMl.round();
+    final t = stats.avgDailyTubeMl.round();
+    final parts = <String>[];
+    if (b > 0) parts.add('$b ml ${s.bottle}');
+    if (t > 0) parts.add('$t ml ${s.tube}');
+    if (parts.isNotEmpty) return parts.join('   ·   ');
+    // No volumes tracked — fall back to average counts per day.
+    if (days.isEmpty) return '';
+    final bc = days.fold<int>(0, (a, d) => a + d.bottleCount) / days.length;
+    final tc = days.fold<int>(0, (a, d) => a + d.tubeCount) / days.length;
+    final counts = <String>[];
+    if (bc > 0) counts.add('${bc.toStringAsFixed(1)} ${s.bottle}');
+    if (tc > 0) counts.add('${tc.toStringAsFixed(1)} ${s.tube}');
+    return counts.join('   ·   ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.bottleSoft,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: const Center(
+              child: BottleIcon(color: AppColors.bottleAccent, size: 16),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  s.feedsPerDay(stats.avgTotalFeedsPerDay.toStringAsFixed(1)),
+                  style: AppText.title.copyWith(fontSize: 18),
+                ),
+                const SizedBox(height: 2),
+                Text(_sub(s), style: AppText.caption),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StatRow extends StatelessWidget {
   final String label;
   final String value;
@@ -299,7 +371,13 @@ class _DailyRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(S.of(context).formatDayHeader(d.day), style: AppText.callout),
+            child: Text(
+              S.of(context).formatDayHeader(
+                    d.day,
+                    dayStartHour: HomeConfigScope.of(context).dayStartHour,
+                  ),
+              style: AppText.callout,
+            ),
           ),
           _Chip(
             icon: CupertinoIcons.moon_fill,

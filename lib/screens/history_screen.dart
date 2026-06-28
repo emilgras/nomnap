@@ -1,17 +1,18 @@
 import 'package:flutter/cupertino.dart';
-import 'package:intl/intl.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/baby_event.dart';
 import '../models/baby_session.dart';
 import '../services/event_store.dart';
-import '../services/file_io.dart' as file_io;
+import '../services/home_config.dart';
+import '../services/statistics.dart' show dayKeyFor;
 import '../theme/app_theme.dart';
 import '../widgets/section_card.dart';
 import '../widgets/sticky_header.dart';
 import '../widgets/wakeup_refresh.dart';
 import 'app_shell.dart' show kFloatingNavReserve;
-import 'tracker_screen.dart' show SessionRow, DiaperRow, TimelineItem, buildTimeline;
+import 'tracker_screen.dart'
+    show SessionRow, TimelineItem, buildTimeline, buildPointRow;
 
 class HistoryScreen extends StatefulWidget {
   final EventStore store;
@@ -36,68 +37,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   void _onChange() => setState(() {});
 
-  Map<DateTime, List<TimelineItem>> _groupByDay(List<TimelineItem> items) {
+  Map<DateTime, List<TimelineItem>> _groupByDay(
+      List<TimelineItem> items, int dayStartHour) {
     final map = <DateTime, List<TimelineItem>>{};
     for (final item in items) {
-      final t = item.timestamp;
-      final k = DateTime(t.year, t.month, t.day);
+      final k = dayKeyFor(item.timestamp, dayStartHour);
       map.putIfAbsent(k, () => []).add(item);
     }
     return map;
-  }
-
-  Future<void> _exportData() async {
-    final json = widget.store.exportJson();
-    final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    // Anchor the iOS/iPad share popover at the originating button/screen.
-    final box = context.findRenderObject() as RenderBox?;
-    final origin = box != null && box.hasSize
-        ? box.localToGlobal(Offset.zero) & box.size
-        : null;
-    await file_io.downloadFile(
-      'nomnap_backup_$date.json',
-      json,
-      sharePositionOrigin: origin,
-    );
-  }
-
-  Future<void> _importData() async {
-    final json = await file_io.pickAndReadFile();
-    if (json == null || !mounted) return;
-    try {
-      final count = await widget.store.importJson(json);
-      if (!mounted) return;
-      showCupertinoDialog(
-        context: context,
-        builder: (ctx) => CupertinoAlertDialog(
-          title: const Text('Import complete'),
-          content: Text(count > 0
-              ? 'Imported $count new events.'
-              : 'No new events to import (all already exist).'),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      showCupertinoDialog(
-        context: context,
-        builder: (ctx) => CupertinoAlertDialog(
-          title: const Text('Import failed'),
-          content: const Text('The file is not a valid NomNap backup.'),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    }
   }
 
   Future<void> _confirmClear() async {
@@ -241,7 +188,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Future<void> _editDiaperTime(BabyEvent event) async {
+  Future<void> _editPointTime(BabyEvent event) async {
     final picked = await _pickTime(
       title: S.of(context).editTime,
       initial: event.timestamp,
@@ -251,12 +198,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Future<void> _confirmDeleteDiaper(BabyEvent event) async {
+  Future<void> _confirmDeletePoint(BabyEvent event) async {
     final s = S.of(context);
+    final message =
+        event.type.isDiaper ? s.deleteThisDiaper : s.deleteThisEntry;
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: Text(s.deleteThisDiaper),
+        title: Text(message),
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(ctx, false),
@@ -275,9 +224,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  void _openDiaperMenu(BabyEvent event) {
+  String _pointLabel(S s, BabyEvent event) {
+    switch (event.type) {
+      case EventType.diaperPee:
+        return s.pee;
+      case EventType.diaperPoop:
+        return s.poop;
+      case EventType.feedBottle:
+        return s.bottle;
+      case EventType.feedTube:
+        return s.tube;
+      default:
+        return '';
+    }
+  }
+
+  void _openPointMenu(BabyEvent event) {
     final s = S.of(context);
-    final label = event.type == EventType.diaperPee ? s.pee : s.poop;
+    final label = _pointLabel(s, event);
     showCupertinoModalPopup(
       context: context,
       builder: (ctx) => Padding(
@@ -292,7 +256,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             CupertinoActionSheetAction(
               onPressed: () {
                 Navigator.pop(ctx);
-                _editDiaperTime(event);
+                _editPointTime(event);
               },
               child: Text(s.editTime),
             ),
@@ -300,7 +264,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               isDestructiveAction: true,
               onPressed: () {
                 Navigator.pop(ctx);
-                _confirmDeleteDiaper(event);
+                _confirmDeletePoint(event);
               },
               child: Text(s.delete),
             ),
@@ -324,7 +288,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final isFeed = session.kind == SessionKind.feed;
     final sl = s.sideLabel(session.side);
     final sideTag = isFeed && sl.isNotEmpty ? ' · $sl' : '';
-    final kindLabel = isFeed ? '${s.feed}$sideTag' : s.sleep;
+    final kindLabel = isFeed ? '${s.breast}$sideTag' : s.sleep;
     showCupertinoModalPopup(
       context: context,
       builder: (ctx) => Padding(
@@ -391,9 +355,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final timeline = buildTimeline(
       widget.store.sessions,
-      widget.store.diaperEvents,
+      widget.store.pointEvents,
     );
-    final grouped = _groupByDay(timeline);
+    final dayStartHour = HomeConfigScope.of(context).dayStartHour;
+    final grouped = _groupByDay(timeline, dayStartHour);
     final days = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
     final topInset = MediaQuery.of(context).padding.top;
@@ -409,27 +374,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(40, 44),
-                    onPressed: _importData,
-                    child: const Icon(
-                      CupertinoIcons.tray_arrow_down,
-                      color: AppColors.sleepAccent,
-                      size: 22,
-                    ),
-                  ),
-                  if (timeline.isNotEmpty)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(40, 44),
-                      onPressed: _exportData,
-                      child: const Icon(
-                        CupertinoIcons.tray_arrow_up,
-                        color: AppColors.sleepAccent,
-                        size: 22,
-                      ),
-                    ),
                   if (timeline.isNotEmpty)
                     CupertinoButton(
                       padding: EdgeInsets.zero,
@@ -478,7 +422,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          SectionHeader(S.of(context).formatDayHeader(day)),
+                          SectionHeader(S.of(context)
+                              .formatDayHeader(day, dayStartHour: dayStartHour)),
                           SectionCard(
                             padding: EdgeInsets.zero,
                             child: Column(
@@ -489,9 +434,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       session: s,
                                       onTap: () => _openRowMenu(s),
                                     ),
-                                    diaper: (e) => DiaperRow(
-                                      event: e,
-                                      onTap: () => _openDiaperMenu(e),
+                                    point: (e) => buildPointRow(
+                                      e,
+                                      onTap: () => _openPointMenu(e),
                                     ),
                                   ),
                                   if (i < dayItems.length - 1)

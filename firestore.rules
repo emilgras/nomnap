@@ -1,0 +1,92 @@
+rules_version = '2';
+
+// NomNap security rules — Anonymous Auth + invite-code sharing.
+//
+// Model:
+//   households/{hid}
+//     - createdBy: uid of the founder
+//     - babyName, createdAt
+//     members/{uid}      ← one doc per caregiver. Existence == membership.
+//     events/{eventId}   ← BabyEvent, only members read/write
+//   invites/{code}
+//     - householdId, createdBy, expiresAt
+//
+// Joining: a non-member reads invites/{code} (they hold the code), then
+// creates households/{hid}/members/{their-uid} carrying that code. The rule
+// validates the invite via get() — no Cloud Functions, stays on the free plan.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(hid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid));
+    }
+
+    function validInvite(hid, code) {
+      return code != null
+        && exists(/databases/$(database)/documents/invites/$(code))
+        && get(/databases/$(database)/documents/invites/$(code)).data.householdId == hid
+        && get(/databases/$(database)/documents/invites/$(code)).data.expiresAt > request.time;
+    }
+
+    match /households/{hid} {
+      allow get:            if isMember(hid);
+      allow list:           if false; // never enumerable
+      allow create:         if isSignedIn()
+                            && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isMember(hid);
+
+      match /members/{uid} {
+        allow read: if isMember(hid);
+        // Self-add only: either you founded this household, or you hold a valid invite.
+        allow create: if isSignedIn()
+                      && request.auth.uid == uid
+                      && (
+                        get(/databases/$(database)/documents/households/$(hid)).data.createdBy == request.auth.uid
+                        || validInvite(hid, request.resource.data.get('inviteCode', ''))
+                      );
+        allow update: if false;
+        allow delete: if isMember(hid); // any member can remove a caregiver (incl. self)
+      }
+
+      match /events/{eventId} {
+        allow read, write: if isMember(hid);
+      }
+    }
+
+    match /invites/{code} {
+      allow get:    if isSignedIn();        // resolve a code you were given
+      allow list:   if false;               // cannot be enumerated/guessed
+      allow create: if isSignedIn()
+                    && request.resource.data.createdBy == request.auth.uid
+                    && isMember(request.resource.data.householdId);
+      allow update: if false;
+      allow delete: if isSignedIn()
+                    && isMember(resource.data.householdId); // revoke an invite
+    }
+
+    // User feedback (e.g. "missing tracker" suggestions). Write-only from the
+    // client and reviewed in the Firebase console; never readable in-app, so a
+    // caregiver can't enumerate or tamper with others' submissions.
+    match /feedback/{id} {
+      allow read, update, delete: if false;
+      allow create: if isSignedIn()
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() <= 2000
+                    // Optional contact email; absent or a bounded string.
+                    && (
+                      !('email' in request.resource.data)
+                      || request.resource.data.email == null
+                      || (request.resource.data.email is string
+                          && request.resource.data.email.size() <= 320)
+                    );
+    }
+  }
+}

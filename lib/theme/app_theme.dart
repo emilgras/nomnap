@@ -20,6 +20,10 @@ class AppColors {
   static const sleepSoft = Color(0xFFEEF0FF);
   static const feedAccent = Color(0xFFFF8A65);    // warm coral
   static const feedSoft = Color(0xFFFFF1EC);
+  static const bottleAccent = Color(0xFFE0A325);  // warm amber
+  static const bottleSoft = Color(0xFFFBF3E0);
+  static const tubeAccent = Color(0xFF8E7CE0);    // soft violet
+  static const tubeSoft = Color(0xFFF0EDFB);
   static const diaperAccent = Color(0xFF43A692);  // teal green
   static const diaperSoft = Color(0xFFE8F5F1);
 

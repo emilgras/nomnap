@@ -1,0 +1,25 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "nomnap-d3f25",
+          "appId": "1:753473650924:android:ee85c0e7ee2c64db57e5c9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "nomnap-d3f25",
+          "configurations": {
+            "android": "1:753473650924:android:ee85c0e7ee2c64db57e5c9",
+            "ios": "1:753473650924:ios:a7de3c0af26664fa57e5c9"
+          }
+        }
+      }
+    }
+  }
+}

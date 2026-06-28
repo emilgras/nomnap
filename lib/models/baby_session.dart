@@ -88,8 +88,11 @@ class BabySession {
             openFeed = null;
           }
           break;
+        case EventType.feedBottle:
+        case EventType.feedTube:
         case EventType.diaperPee:
         case EventType.diaperPoop:
+          // Point events — not paired into sessions.
           break;
       }
     }

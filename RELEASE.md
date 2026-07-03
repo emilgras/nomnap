@@ -5,6 +5,10 @@ Android Play Store and Apple App Store. Read the **Gotchas** before every
 release — at least one of them silently breaks *release builds only* (they work
 fine in `flutter run`).
 
+> **First-time iOS / Mac setup?** See [`IOS_SETUP.md`](IOS_SETUP.md) for the full
+> clone → Xcode → device → TestFlight walkthrough. This doc is Android-focused
+> plus cross-platform baseline notes.
+
 ---
 
 ## ⚠️ Gotchas that only bite in release builds

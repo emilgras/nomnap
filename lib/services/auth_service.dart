@@ -23,4 +23,10 @@ class AuthService {
   }
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
+
+  /// Permanently deletes the current (anonymous) account. After this the user
+  /// is signed out; call [ensureSignedIn] to mint a fresh anonymous identity.
+  Future<void> deleteAccount() async {
+    await _auth.currentUser?.delete();
+  }
 }

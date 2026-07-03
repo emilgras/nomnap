@@ -3,7 +3,7 @@
 /// Stored by stable [key] (never reorder/rename the keys — persisted data
 /// depends on them). [TrackerKind.values] order is the default home layout.
 /// `feed` is the breast-feed card; `bottle`/`tube` are the other feed types.
-enum TrackerKind { sleep, feed, bottle, tube, diaper }
+enum TrackerKind { sleep, feed, bottle, tube, diaper, weight, length, head }
 
 extension TrackerKindX on TrackerKind {
   String get key {
@@ -18,6 +18,36 @@ extension TrackerKindX on TrackerKind {
         return 'tube';
       case TrackerKind.diaper:
         return 'diaper';
+      case TrackerKind.weight:
+        return 'weight';
+      case TrackerKind.length:
+        return 'length';
+      case TrackerKind.head:
+        return 'head';
+    }
+  }
+
+  /// Growth measurements (weight/length/head) — logged as a single value at a
+  /// point in time, unlike the count/duration trackers.
+  bool get isMeasurement =>
+      this == TrackerKind.weight ||
+      this == TrackerKind.length ||
+      this == TrackerKind.head;
+
+  /// The category this tracker belongs to in Tilpas and the + sheet.
+  TrackerGroup get group {
+    switch (this) {
+      case TrackerKind.feed:
+      case TrackerKind.bottle:
+      case TrackerKind.tube:
+        return TrackerGroup.food;
+      case TrackerKind.sleep:
+      case TrackerKind.diaper:
+        return TrackerGroup.activity;
+      case TrackerKind.weight:
+      case TrackerKind.length:
+      case TrackerKind.head:
+        return TrackerGroup.growth;
     }
   }
 
@@ -28,6 +58,10 @@ extension TrackerKindX on TrackerKind {
     return null;
   }
 }
+
+/// Categories that group the trackers in Tilpas and the + sheet, in the order
+/// they are displayed (Food → Activity → Growth).
+enum TrackerGroup { food, activity, growth }
 
 /// One tracker's home-page configuration: whether it's shown and its
 /// per-tracker [options]. [options] is reserved for future per-component

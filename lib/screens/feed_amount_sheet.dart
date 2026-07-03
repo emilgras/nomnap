@@ -158,7 +158,7 @@ class _FeedAmountSheetState extends State<FeedAmountSheet> {
                     disabledColor: accent.withValues(alpha: 0.4),
                     onPressed: _valid ? _save : null,
                     child: Text(
-                      s.logFeed,
+                      s.add,
                       style: AppText.callout.copyWith(
                         color: CupertinoColors.white,
                         fontWeight: FontWeight.w600,

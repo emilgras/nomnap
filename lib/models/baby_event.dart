@@ -9,6 +9,9 @@ enum EventType {
   feedTube,
   diaperPee,
   diaperPoop,
+  weight,
+  length,
+  headCirc,
 }
 
 extension EventTypeX on EventType {
@@ -30,6 +33,12 @@ extension EventTypeX on EventType {
         return 'diaper_pee';
       case EventType.diaperPoop:
         return 'diaper_poop';
+      case EventType.weight:
+        return 'weight';
+      case EventType.length:
+        return 'length';
+      case EventType.headCirc:
+        return 'head_circ';
     }
   }
 
@@ -40,8 +49,15 @@ extension EventTypeX on EventType {
   bool get isInstantFeed =>
       this == EventType.feedBottle || this == EventType.feedTube;
 
+  /// Growth measurements (weight/length/head circumference): a single value
+  /// (in meta['value'], with meta['unit']) logged at a point in time.
+  bool get isMeasurement =>
+      this == EventType.weight ||
+      this == EventType.length ||
+      this == EventType.headCirc;
+
   /// Point-in-time events that show as single timeline rows (not sessions).
-  bool get isPointEvent => isDiaper || isInstantFeed;
+  bool get isPointEvent => isDiaper || isInstantFeed || isMeasurement;
 
   /// Resolves an id, returning null for an unknown one (e.g. a forward-compat
   /// event written by a newer client) so callers can skip it instead of

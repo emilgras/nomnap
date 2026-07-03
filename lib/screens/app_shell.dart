@@ -1,11 +1,12 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/cupertino.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 import '../l10n/app_localizations.dart';
+import '../services/baby_profile_service.dart';
 import '../services/event_store.dart';
 import '../theme/app_theme.dart';
 import 'history_screen.dart';
+import 'onboarding_flow.dart';
 import 'profile_screen.dart';
 import 'stats_screen.dart';
 import 'tracker_screen.dart';
@@ -13,7 +14,7 @@ import 'tracker_screen.dart';
 /// Total vertical space the floating pill nav occupies, including its bottom
 /// gap. Scrollable screens should reserve this much padding at their bottom
 /// so the last item isn't hidden behind the floating nav.
-const double kFloatingNavReserve = 140;
+const double kFloatingNavReserve = 112;
 
 class AppShell extends StatefulWidget {
   final EventStore store;
@@ -25,6 +26,25 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
+  bool _checkedOnboarding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // On the very first launch (no completed onboarding on this device), open
+    // the setup flow once the first frame is in. The flag is per-device, so
+    // switching households later never re-triggers it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowOnboarding());
+  }
+
+  void _maybeShowOnboarding() {
+    if (_checkedOnboarding || !mounted) return;
+    _checkedOnboarding = true;
+    final profile = BabyProfileScope.of(context);
+    if (!profile.onboardingComplete) {
+      OnboardingFlow.show(context, store: widget.store);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +88,10 @@ class _AppShellState extends State<AppShell> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: bottomInset + 28,
+            // Sit right at the bottom edge like a native iOS floating tab bar:
+            // tuck it into the home-indicator inset so it hugs the bottom,
+            // clamped so it never collides with the very edge on older phones.
+            bottom: (bottomInset - 2).clamp(18.0, double.infinity),
             // Center + ConstrainedBox: keeps the nav at a phone-friendly
             // width even on tablet/desktop sizes (doesn't grow with screen).
             // Side padding still gives breathing room on small screens.
@@ -107,17 +130,14 @@ List<_NavItem> _navItems(S s) => [
 class _FloatingPillNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onChanged;
-  const _FloatingPillNav({
-    required this.currentIndex,
-    required this.onChanged,
-  });
+  const _FloatingPillNav({required this.currentIndex, required this.onChanged});
 
   // For concentric rounded corners: inner radius = outer radius − inset.
   // height=58 ⇒ full stadium radius = 29; with a uniform 4px inset on all
   // sides the inner active pill needs radius 25 to match the outer curve.
-  static const double _outerRadius = 29;
+  static const double _outerRadius = 30;
   static const double _innerInset = 4;
-  static const double _innerRadius = _outerRadius - _innerInset; // 25
+  static const double _innerRadius = _outerRadius - _innerInset; // 26
 
   @override
   Widget build(BuildContext context) {
@@ -138,19 +158,27 @@ class _FloatingPillNav extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(_outerRadius),
+      child: LiquidGlass.withOwnLayer(
+        shape: const LiquidRoundedSuperellipse(borderRadius: _outerRadius),
         clipBehavior: Clip.antiAlias,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-          child: Container(
-            height: 58,
-            color: CupertinoColors.white.withValues(alpha: 0.82),
+        // Real iOS-26-style glass: refracts + tints the content scrolling
+        // behind the pill. A light glassColor keeps icon/label legible over
+        // busy backgrounds; drop its alpha for a clearer, more watery look.
+        settings: const LiquidGlassSettings(
+          thickness: 14,
+          blur: 6,
+          glassColor: Color(0x3DFFFFFF),
+          lightIntensity: 0.6,
+          saturation: 1.25,
+          refractiveIndex: 1.25,
+        ),
+        child: SizedBox(
+          height: 62,
+          child: Padding(
             padding: const EdgeInsets.all(_innerInset),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final slotWidth =
-                    constraints.maxWidth / items.length;
+                final slotWidth = constraints.maxWidth / items.length;
                 return Stack(
                   children: [
                     AnimatedPositioned(
@@ -162,10 +190,8 @@ class _FloatingPillNav extends StatelessWidget {
                       width: slotWidth,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: AppColors.sleepAccent
-                              .withValues(alpha: 0.14),
-                          borderRadius:
-                              BorderRadius.circular(_innerRadius),
+                          color: AppColors.sleepAccent.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(_innerRadius),
                         ),
                       ),
                     ),
@@ -215,8 +241,10 @@ class _PillNavItem extends StatelessWidget {
         curve: Curves.easeOutCubic,
         tween: Tween(begin: active ? 1.0 : 0.0, end: active ? 1.0 : 0.0),
         builder: (context, t, _) {
+          // Inactive tabs use a near-black (not grey) so icons stay legible
+          // over the translucent glass; active fades to the accent.
           final color = Color.lerp(
-            AppColors.textSecondary,
+            const Color(0xFF1C1C1E),
             AppColors.sleepAccent,
             t,
           )!;
@@ -225,7 +253,7 @@ class _PillNavItem extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(item.icon, size: 18, color: color),
+                Icon(item.icon, size: 23, color: color),
                 const SizedBox(height: 2),
                 Text(
                   item.label,

@@ -54,6 +54,10 @@ class HouseholdService {
     await prefs.remove(_activeHouseholdKey);
   }
 
+  /// Forgets the cached active household so the next [ensureHousehold] creates a
+  /// fresh one. Used when a device wipes its profile.
+  Future<void> clearActiveHousehold() => _clearActiveHousehold();
+
   /// Resolves the household for [uid], creating a fresh one on first run.
   ///
   /// If a cached household exists and the user is still a member, it is reused;
@@ -137,6 +141,14 @@ class HouseholdService {
                   ))
               .toList(),
         );
+  }
+
+  /// This device's role in [hid] — 'owner' or 'caregiver' — or null if it is
+  /// not (or no longer) a member. Owners created the household; caregivers
+  /// joined via an invite.
+  Future<String?> memberRole(String hid, String uid) async {
+    final doc = await _member(hid, uid).get();
+    return doc.data()?['role'] as String?;
   }
 
   /// Removes a caregiver (revokes access immediately via rules).

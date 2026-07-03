@@ -48,32 +48,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return map;
   }
 
-  Future<void> _confirmClear() async {
-    final s = S.of(context);
-    final confirmed = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(s.clearAllTitle),
-        content: Text(s.clearAllMessage),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(s.cancel),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(s.deleteAll),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      await runGuarded(context, () => widget.store.clearAll(),
-          errorMessage: s.errUpdate);
-    }
-  }
-
   Future<DateTime?> _pickTime({
     required String title,
     required DateTime initial,
@@ -244,6 +218,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         return s.bottle;
       case EventType.feedTube:
         return s.tube;
+      case EventType.weight:
+        return s.weight;
+      case EventType.length:
+        return s.length;
+      case EventType.headCirc:
+        return s.headCirc;
       default:
         return '';
     }
@@ -384,22 +364,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
             delegate: StickyGlassHeader(
               topInset: topInset,
               title: StickyHeaderTitle(S.of(context).history),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (timeline.isNotEmpty)
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(40, 44),
-                      onPressed: _confirmClear,
-                      child: const Icon(
-                        CupertinoIcons.trash,
-                        color: AppColors.danger,
-                        size: 22,
-                      ),
-                    ),
-                ],
-              ),
             ),
           ),
           const WakeupRefreshControl(),

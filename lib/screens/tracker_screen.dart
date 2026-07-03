@@ -11,6 +11,7 @@ import '../widgets/wakeup_refresh.dart';
 import '../models/baby_event.dart';
 import '../models/baby_session.dart';
 import '../models/tracker_kind.dart';
+import '../services/baby_profile_service.dart';
 import '../services/event_store.dart';
 import '../services/home_config.dart';
 import '../services/statistics.dart';
@@ -23,6 +24,7 @@ import 'add_entry_sheet.dart';
 import 'app_shell.dart' show kFloatingNavReserve;
 import 'customize_home_sheet.dart';
 import 'feed_amount_sheet.dart';
+import 'measurement_sheet.dart';
 
 class TrackerScreen extends StatefulWidget {
   final EventStore store;
@@ -97,6 +99,28 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
     if (ok) unawaited(HapticFeedback.mediumImpact());
     return ok;
+  }
+
+  Future<bool> _logMeasurement(
+      EventType type, String value, String unit) async {
+    final ok = await runGuarded(
+      context,
+      () => widget.store.add(type, meta: {'value': value, 'unit': unit}),
+    );
+    if (ok) unawaited(HapticFeedback.mediumImpact());
+    return ok;
+  }
+
+  /// "4250 g · 2d ago" for a measurement card, or null if never measured.
+  String? _lastMeasurement(EventType type, String unit) {
+    final e = widget.store.lastOf(type);
+    final v = e?.meta?['value'];
+    if (e == null || v == null) return null;
+    final s = S.of(context);
+    return s.lastMeasured(
+      s.measurementValue(v, e.meta?['unit'] ?? unit),
+      s.relativeTimeAgo(e.timestamp),
+    );
   }
 
   /// Builds the enabled tracker cards in configured order, with 12px gaps.
@@ -200,6 +224,44 @@ class _TrackerScreenState extends State<TrackerScreen> {
           idleDetail: parts.isEmpty ? null : parts.join('  ·  '),
           onLog: _logDiaper,
         );
+      case TrackerKind.weight:
+        return _MeasurementCard(
+          type: EventType.weight,
+          title: s.weight,
+          unit: s.gramsUnit,
+          allowDecimal: false,
+          icon: CupertinoIcons.gauge,
+          accent: AppColors.weightAccent,
+          softBg: AppColors.weightSoft,
+          idleDetail: _lastMeasurement(EventType.weight, s.gramsUnit),
+          onLog: (value) =>
+              _logMeasurement(EventType.weight, value, s.gramsUnit),
+        );
+      case TrackerKind.length:
+        return _MeasurementCard(
+          type: EventType.length,
+          title: s.length,
+          unit: s.cmUnit,
+          allowDecimal: true,
+          icon: CupertinoIcons.resize_v,
+          accent: AppColors.lengthAccent,
+          softBg: AppColors.lengthSoft,
+          idleDetail: _lastMeasurement(EventType.length, s.cmUnit),
+          onLog: (value) => _logMeasurement(EventType.length, value, s.cmUnit),
+        );
+      case TrackerKind.head:
+        return _MeasurementCard(
+          type: EventType.headCirc,
+          title: s.headCirc,
+          unit: s.cmUnit,
+          allowDecimal: true,
+          icon: CupertinoIcons.smiley,
+          accent: AppColors.headAccent,
+          softBg: AppColors.headSoft,
+          idleDetail: _lastMeasurement(EventType.headCirc, s.cmUnit),
+          onLog: (value) =>
+              _logMeasurement(EventType.headCirc, value, s.cmUnit),
+        );
     }
   }
 
@@ -253,30 +315,15 @@ class _TrackerScreenState extends State<TrackerScreen> {
                   ),
                 ],
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(44, 44),
-                    onPressed: () => CustomizeHomeSheet.show(context, config),
-                    child: const Icon(
-                      CupertinoIcons.slider_horizontal_3,
-                      color: AppColors.sleepAccent,
-                      size: 26,
-                    ),
-                  ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(44, 44),
-                    onPressed: () => AddEntrySheet.show(context, widget.store),
-                    child: const Icon(
-                      CupertinoIcons.add_circled_solid,
-                      color: AppColors.sleepAccent,
-                      size: 32,
-                    ),
-                  ),
-                ],
+              trailing: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(44, 44),
+                onPressed: () => AddEntrySheet.show(context, widget.store),
+                child: const Icon(
+                  CupertinoIcons.add_circled_solid,
+                  color: AppColors.sleepAccent,
+                  size: 32,
+                ),
               ),
             ),
           ),
@@ -289,9 +336,35 @@ class _TrackerScreenState extends State<TrackerScreen> {
               4,
             ),
             sliver: SliverToBoxAdapter(
-              child: Text(
-                S.of(context).greetingForHour(DateTime.now().hour),
-                style: AppText.subhead,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        final s = S.of(context);
+                        final p = BabyProfileScope.of(context).profile;
+                        final greeting =
+                            s.greetingForHour(DateTime.now().hour);
+                        final name = p.hasName ? ' ${p.name}' : '';
+                        final age = (p.hasName && p.birthDate != null)
+                            ? s.formatAge(p.birthDate!)
+                            : '';
+                        final text = age.isEmpty
+                            ? '$greeting$name'
+                            : '$greeting$name · $age';
+                        return Text(
+                          text,
+                          style: AppText.subhead,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
+                    ),
+                  ),
+                  _CustomizePill(
+                    onTap: () => CustomizeHomeSheet.show(context, config),
+                  ),
+                ],
               ),
             ),
           ),
@@ -905,7 +978,7 @@ class _QuickFeedCardState extends State<_QuickFeedCard> {
                         size: 20,
                       )
                     : Text(
-                        S.of(context).logFeed,
+                        S.of(context).add,
                         key: const ValueKey('label'),
                         style: AppText.callout.copyWith(
                           color: CupertinoColors.white,
@@ -913,6 +986,158 @@ class _QuickFeedCardState extends State<_QuickFeedCard> {
                         ),
                       ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A growth-measurement card (weight/length/head). Tapping "Add" opens a
+/// numeric sheet; on save it logs the value and flashes a checkmark.
+class _MeasurementCard extends StatefulWidget {
+  final EventType type;
+  final String title;
+  final String unit;
+  final bool allowDecimal;
+  final IconData icon;
+  final Color accent;
+  final Color softBg;
+  final String? idleDetail;
+  final Future<bool> Function(String value) onLog;
+
+  const _MeasurementCard({
+    required this.type,
+    required this.title,
+    required this.unit,
+    required this.allowDecimal,
+    required this.icon,
+    required this.accent,
+    required this.softBg,
+    required this.onLog,
+    this.idleDetail,
+  });
+
+  @override
+  State<_MeasurementCard> createState() => _MeasurementCardState();
+}
+
+class _MeasurementCardState extends State<_MeasurementCard> {
+  bool _confirmed = false;
+
+  Future<void> _onTap() async {
+    final value = await MeasurementSheet.show(
+      context,
+      title: widget.title,
+      unit: widget.unit,
+      accent: widget.accent,
+      allowDecimal: widget.allowDecimal,
+    );
+    if (value == null) return; // cancelled
+    final ok = await widget.onLog(value);
+    if (!ok || !mounted) return;
+    setState(() => _confirmed = true);
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) setState(() => _confirmed = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: widget.softBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(widget.icon, color: widget.accent, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.title, style: AppText.headline),
+                const SizedBox(height: 1),
+                Text(
+                  widget.idleDetail ?? S.of(context).notMeasuredYet,
+                  style: AppText.footnote,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            height: 40,
+            child: CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              color: widget.accent,
+              onPressed: _onTap,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) =>
+                    ScaleTransition(scale: animation, child: child),
+                child: _confirmed
+                    ? const Icon(
+                        CupertinoIcons.checkmark_alt,
+                        key: ValueKey('check'),
+                        color: CupertinoColors.white,
+                        size: 20,
+                      )
+                    : Text(
+                        S.of(context).add,
+                        key: const ValueKey('label'),
+                        style: AppText.callout.copyWith(
+                          color: CupertinoColors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small tinted "Tilpas" pill shown at the end of the greeting row.
+class _CustomizePill extends StatelessWidget {
+  final VoidCallback onTap;
+  const _CustomizePill({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      minimumSize: const Size(0, 0),
+      borderRadius: BorderRadius.circular(AppRadius.button),
+      color: AppColors.sleepSoft,
+      onPressed: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            CupertinoIcons.slider_horizontal_3,
+            color: AppColors.sleepAccent,
+            size: 17,
+          ),
+          const SizedBox(width: 7),
+          Text(
+            S.of(context).customize,
+            style: AppText.subhead.copyWith(
+              color: AppColors.sleepAccent,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -976,7 +1201,7 @@ class _TodaySummary extends StatelessWidget {
           softBg: AppColors.diaperSoft,
           value: '${pees + poops}',
           label: s.diaperPlural(pees + poops),
-          detail: '$pees Pee  $poops Poo',
+          detail: '$pees ${s.pee}  $poops ${s.poop}',
         ),
     ];
 
@@ -1247,7 +1472,126 @@ Widget buildPointRow(BabyEvent event, {VoidCallback? onTap}) {
   if (event.type.isInstantFeed) {
     return FeedPointRow(event: event, onTap: onTap);
   }
+  if (event.type.isMeasurement) {
+    return MeasurementRow(event: event, onTap: onTap);
+  }
   return DiaperRow(event: event, onTap: onTap);
+}
+
+/// Visual metadata for a growth measurement (icon / colors / label / unit),
+/// shared by the home card and the timeline row.
+class MeasurementInfo {
+  final Color accent;
+  final Color softBg;
+  final IconData icon;
+  final String Function(S) name;
+  final String Function(S) unit;
+  const MeasurementInfo({
+    required this.accent,
+    required this.softBg,
+    required this.icon,
+    required this.name,
+    required this.unit,
+  });
+}
+
+MeasurementInfo measurementInfoFor(EventType type) {
+  switch (type) {
+    case EventType.length:
+      return MeasurementInfo(
+        accent: AppColors.lengthAccent,
+        softBg: AppColors.lengthSoft,
+        icon: CupertinoIcons.resize_v,
+        name: (s) => s.length,
+        unit: (s) => s.cmUnit,
+      );
+    case EventType.headCirc:
+      return MeasurementInfo(
+        accent: AppColors.headAccent,
+        softBg: AppColors.headSoft,
+        icon: CupertinoIcons.smiley,
+        name: (s) => s.headCirc,
+        unit: (s) => s.cmUnit,
+      );
+    case EventType.weight:
+    default:
+      return MeasurementInfo(
+        accent: AppColors.weightAccent,
+        softBg: AppColors.weightSoft,
+        icon: CupertinoIcons.gauge,
+        name: (s) => s.weight,
+        unit: (s) => s.gramsUnit,
+      );
+  }
+}
+
+/// One timeline row for a growth measurement (weight/length/head).
+class MeasurementRow extends StatelessWidget {
+  final BabyEvent event;
+  final VoidCallback? onTap;
+  const MeasurementRow({super.key, required this.event, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final info = measurementInfoFor(event.type);
+    final value = event.meta?['value'];
+    final unit = event.meta?['unit'] ?? info.unit(s);
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: info.softBg,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(info.icon, color: info.accent, size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(child: Text(info.name(s), style: AppText.callout)),
+                if (value != null && value.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _MetaBadge(
+                    text: s.measurementValue(value, unit),
+                    accent: info.accent,
+                    softBg: info.softBg,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Text(
+            formatClock(event.timestamp),
+            style: AppText.subhead.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          if (onTap != null) ...[
+            const SizedBox(width: 6),
+            const Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: AppColors.textTertiary,
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (onTap == null) return content;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: onTap,
+      child: content,
+    );
+  }
 }
 
 class DiaperRow extends StatelessWidget {

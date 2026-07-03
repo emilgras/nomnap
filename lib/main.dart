@@ -14,6 +14,7 @@ import 'l10n/app_localizations.dart';
 import 'l10n/locale_provider.dart';
 import 'screens/app_shell.dart';
 import 'services/auth_service.dart';
+import 'services/baby_profile_service.dart';
 import 'services/event_store.dart';
 import 'services/home_config.dart';
 import 'services/household_service.dart';
@@ -82,6 +83,7 @@ Future<void> _bootstrap() async {
     runApp(NomNapApp(
       localeProvider: localeProvider,
       homeConfig: homeConfig,
+      auth: auth,
       uid: user.uid,
       initialHouseholdId: householdId,
       households: households,
@@ -119,6 +121,7 @@ CollectionReference<Map<String, dynamic>> _eventsCollection(String hid) =>
 class NomNapApp extends StatefulWidget {
   final LocaleProvider localeProvider;
   final HomeConfig homeConfig;
+  final AuthService auth;
   final String uid;
   final String initialHouseholdId;
   final HouseholdService households;
@@ -126,6 +129,7 @@ class NomNapApp extends StatefulWidget {
     super.key,
     required this.localeProvider,
     required this.homeConfig,
+    required this.auth,
     required this.uid,
     required this.initialHouseholdId,
     required this.households,
@@ -137,28 +141,50 @@ class NomNapApp extends StatefulWidget {
 
 class _NomNapAppState extends State<NomNapApp> {
   late String _householdId;
+  late String _uid;
+  // Whether this device owns the current household. Owners (admins) can wipe
+  // the shared data; caregivers who joined via an invite can only leave.
+  bool _isOwner = true;
   EventStore? _store;
+  BabyProfileService? _profile;
 
   @override
   void initState() {
     super.initState();
     _householdId = widget.initialHouseholdId;
+    _uid = widget.uid;
     _bindStore(_householdId);
   }
 
   Future<void> _bindStore(String hid) async {
-    final old = _store;
-    if (mounted) setState(() => _store = null); // brief loader while swapping
-    old?.dispose();
+    final oldStore = _store;
+    final oldProfile = _profile;
+    if (mounted) {
+      setState(() {
+        _store = null; // brief loader while swapping
+        _profile = null;
+      });
+    }
+    oldStore?.dispose();
+    oldProfile?.dispose();
     final store = EventStore(_eventsCollection(hid));
+    final profile = BabyProfileService(householdId: hid);
     await store.load();
+    await profile.load();
+    // Resolve this device's role in the household so the profile screen can
+    // gate data deletion to the owner. Defaults to caregiver if it can't be
+    // read (least-privilege), so a lookup hiccup can never grant wipe rights.
+    final role = await widget.households.memberRole(hid, _uid);
     if (!mounted) {
       store.dispose();
+      profile.dispose();
       return;
     }
     setState(() {
       _householdId = hid;
       _store = store;
+      _profile = profile;
+      _isOwner = role == 'owner';
     });
   }
 
@@ -168,23 +194,62 @@ class _NomNapAppState extends State<NomNapApp> {
     await _bindStore(newHouseholdId);
   }
 
+  /// Removes this device's profile and bootstraps a fresh, empty one so the app
+  /// stays usable. Invoked from the profile screen behind a confirmation.
+  ///
+  /// Only the owner (admin) wipes the shared baby's data; a caregiver who
+  /// joined via an invite simply leaves, so the data stays for everyone else.
+  /// Ordering matters: everything needing the current identity (deleting
+  /// events, leaving the household) happens *before* the account is deleted.
+  Future<void> _deleteProfile() async {
+    // 1) Only the owner may wipe the shared tracked data.
+    if (_isOwner) await _store?.clearAll();
+
+    // 2) Leave the household (drop this device's membership). Best-effort —
+    //    a fresh household is created below regardless.
+    try {
+      await widget.households.removeMember(_householdId, _uid);
+    } catch (_) {/* non-fatal */}
+
+    // 3) Forget the cached household so ensureHousehold() makes a new one.
+    await widget.households.clearActiveHousehold();
+
+    // 4) Delete the anonymous account last, so the writes above still had auth.
+    try {
+      await widget.auth.deleteAccount();
+    } catch (_) {/* non-fatal; the sign-in below still refreshes identity */}
+
+    // 5) Start over with a brand-new empty profile.
+    final user = await widget.auth.ensureSignedIn();
+    final newHid = await widget.households.ensureHousehold(user.uid);
+    if (!mounted) return;
+    setState(() => _uid = user.uid);
+    await _bindStore(newHid);
+  }
+
   @override
   void dispose() {
     _store?.dispose();
+    _profile?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final store = _store;
+    final profile = _profile;
     return SessionScope(
-      uid: widget.uid,
+      uid: _uid,
       householdId: _householdId,
       households: widget.households,
+      isOwner: _isOwner,
       switchHousehold: _switchHousehold,
+      deleteProfile: _deleteProfile,
       child: HomeConfigScope(
         config: widget.homeConfig,
-        child: LocaleScope(
+        child: _MaybeProfileScope(
+          service: profile,
+          child: LocaleScope(
           provider: widget.localeProvider,
           child: ListenableBuilder(
             listenable: widget.localeProvider,
@@ -213,7 +278,7 @@ class _NomNapAppState extends State<NomNapApp> {
               ),
               // Keyed by household so switching forces a fresh AppShell subtree
               // that re-subscribes its screens to the new store.
-              home: store == null
+              home: (store == null || profile == null)
                   ? const CupertinoPageScaffold(
                       backgroundColor: AppColors.background,
                       child: Center(child: CupertinoActivityIndicator()),
@@ -221,9 +286,27 @@ class _NomNapAppState extends State<NomNapApp> {
                   : AppShell(key: ValueKey(_householdId), store: store),
             ),
           ),
+          ),
         ),
       ),
     );
+  }
+}
+
+/// Wraps [child] in a [BabyProfileScope] once the per-household profile service
+/// is ready. While it's still binding ([service] == null) the child is shown
+/// without the scope — the app root is displaying its loader at that point, so
+/// nothing below actually reads the profile yet.
+class _MaybeProfileScope extends StatelessWidget {
+  final BabyProfileService? service;
+  final Widget child;
+  const _MaybeProfileScope({required this.service, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = service;
+    if (s == null) return child;
+    return BabyProfileScope(service: s, child: child);
   }
 }
 

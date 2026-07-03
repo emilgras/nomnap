@@ -26,6 +26,12 @@ class AppColors {
   static const tubeSoft = Color(0xFFF0EDFB);
   static const diaperAccent = Color(0xFF43A692);  // teal green
   static const diaperSoft = Color(0xFFE8F5F1);
+  static const weightAccent = Color(0xFFEC6A88);  // rose
+  static const weightSoft = Color(0xFFFCEAEE);
+  static const lengthAccent = Color(0xFF3EA8DE);  // sky blue
+  static const lengthSoft = Color(0xFFE7F4FB);
+  static const headAccent = Color(0xFFCF7B4E);    // terracotta
+  static const headSoft = Color(0xFFF9EEE6);
 
   // Status
   static const success = Color(0xFF34C759);

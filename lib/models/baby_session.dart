@@ -99,6 +99,9 @@ class BabySession {
         case EventType.feedTube:
         case EventType.diaperPee:
         case EventType.diaperPoop:
+        case EventType.weight:
+        case EventType.length:
+        case EventType.headCirc:
           // Point events — not paired into sessions.
           break;
       }

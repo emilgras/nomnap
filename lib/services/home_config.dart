@@ -26,7 +26,7 @@ class HomeConfig extends ChangeNotifier {
   /// Full ordered list including disabled trackers (for the editor).
   List<TrackerSetting> get order => List.unmodifiable(_order);
 
-  /// Enabled trackers in display order (for the home page).
+  /// Enabled trackers in the user's custom display order (for the home page).
   List<TrackerKind> get enabledInOrder =>
       [for (final s in _order) if (s.enabled) s.kind];
 

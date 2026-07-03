@@ -1,7 +1,10 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/baby_event.dart';
+import '../models/tracker_kind.dart';
 import '../services/event_store.dart';
 import '../services/home_config.dart';
 import '../services/statistics.dart';
@@ -13,6 +16,9 @@ import '../widgets/sticky_header.dart';
 import '../widgets/wakeup_refresh.dart';
 import 'app_shell.dart' show kFloatingNavReserve;
 
+/// Time window the stats are computed over.
+enum _Range { today, week, month, all }
+
 class StatsScreen extends StatefulWidget {
   final EventStore store;
   const StatsScreen({super.key, required this.store});
@@ -22,6 +28,24 @@ class StatsScreen extends StatefulWidget {
 }
 
 class _StatsScreenState extends State<StatsScreen> {
+  _Range _range = _Range.week;
+
+  /// Restrict events to the selected window. Rolling windows (7/30 days) keyed
+  /// off the logical day boundary; "all" returns everything.
+  List<BabyEvent> _eventsInRange(List<BabyEvent> events, int dayStartHour) {
+    if (_range == _Range.all) return events;
+    final key = dayKeyFor(DateTime.now(), dayStartHour);
+    final todayStart = DateTime(key.year, key.month, key.day)
+        .add(Duration(hours: dayStartHour));
+    final cutoff = switch (_range) {
+      _Range.today => todayStart,
+      _Range.week => todayStart.subtract(const Duration(days: 6)),
+      _Range.month => todayStart.subtract(const Duration(days: 29)),
+      _Range.all => todayStart, // unreachable
+    };
+    return events.where((e) => !e.timestamp.isBefore(cutoff)).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -38,12 +62,20 @@ class _StatsScreenState extends State<StatsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final config = HomeConfigScope.of(context);
     final stats = Statistics(
-      widget.store.events,
-      dayStartHour: HomeConfigScope.of(context).dayStartHour,
+      _eventsInRange(widget.store.events, config.dayStartHour),
+      dayStartHour: config.dayStartHour,
     );
     final daily = stats.dailyStats;
     final hasData = daily.isNotEmpty;
+
+    // Mirror the home page: only surface a tracker's stats when it's enabled.
+    // In particular, hide breastfeed (Amning) figures when that card is off.
+    final enabled = config.enabledInOrder.toSet();
+    final showSleep = enabled.contains(TrackerKind.sleep);
+    final showFeed = enabled.contains(TrackerKind.feed);
+    final hasSessionAverages = showSleep || showFeed;
 
     final topInset = MediaQuery.of(context).padding.top;
     return CupertinoPageScaffold(
@@ -67,13 +99,20 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                _RangeSelector(
+                  range: _range,
+                  onChanged: (r) => setState(() => _range = r),
+                ),
+                const SizedBox(height: 18),
                 if (!hasData)
                   SectionCard(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       child: Center(
                         child: Text(
-                          S.of(context).noDataYet,
+                          _range == _Range.all
+                              ? S.of(context).noDataYet
+                              : S.of(context).noDataInRange,
                           textAlign: TextAlign.center,
                           style: AppText.subhead,
                         ),
@@ -82,39 +121,54 @@ class _StatsScreenState extends State<StatsScreen> {
                   )
                 else ...[
                   SectionHeader(S.of(context).dailyAverages),
-                  _AvgGrid(stats: stats),
-                  const SizedBox(height: 12),
+                  if (showSleep || showFeed) ...[
+                    _AvgGrid(
+                      stats: stats,
+                      showSleep: showSleep,
+                      showFeed: showFeed,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   _DiaperAvgTile(stats: stats),
                   if (stats.hasSupplementalFeeds) ...[
                     const SizedBox(height: 12),
                     _VolumeTile(stats: stats),
                   ],
-                  const SizedBox(height: 24),
-                  SectionHeader(S.of(context).sessionAverages),
-                  SectionCard(
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        _StatRow(
-                          label: S.of(context).avgSleepLength,
-                          value: formatDuration(stats.avgSleepDuration),
-                          accent: AppColors.sleepAccent,
-                        ),
-                        const _RowDivider(),
-                        _StatRow(
-                          label: S.of(context).avgFeedLength,
-                          value: formatDuration(stats.avgFeedDuration),
-                          accent: AppColors.feedAccent,
-                        ),
-                        const _RowDivider(),
-                        _StatRow(
-                          label: S.of(context).longestSleep,
-                          value: formatDuration(stats.longestSleep),
-                          accent: AppColors.sleepAccent,
-                        ),
-                      ],
+                  if (hasSessionAverages) ...[
+                    const SizedBox(height: 24),
+                    SectionHeader(S.of(context).sessionAverages),
+                    SectionCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          for (final row in [
+                            if (showSleep)
+                              _StatRow(
+                                label: S.of(context).avgSleepLength,
+                                value: formatDuration(stats.avgSleepDuration),
+                                accent: AppColors.sleepAccent,
+                              ),
+                            if (showFeed)
+                              _StatRow(
+                                label: S.of(context).avgFeedLength,
+                                value: formatDuration(stats.avgFeedDuration),
+                                accent: AppColors.feedAccent,
+                              ),
+                            if (showSleep)
+                              _StatRow(
+                                label: S.of(context).longestSleep,
+                                value: formatDuration(stats.longestSleep),
+                                accent: AppColors.sleepAccent,
+                              ),
+                          ].indexed)
+                            ...[
+                            if (row.$1 > 0) const _RowDivider(),
+                            row.$2,
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 24),
                   SectionHeader(S.of(context).byDay),
                   SectionCard(
@@ -122,7 +176,11 @@ class _StatsScreenState extends State<StatsScreen> {
                     child: Column(
                       children: [
                         for (var i = 0; i < daily.length; i++) ...[
-                          _DailyRow(d: daily[i]),
+                          _DailyRow(
+                            d: daily[i],
+                            showSleep: showSleep,
+                            showFeed: showFeed,
+                          ),
                           if (i < daily.length - 1) const _RowDivider(),
                         ],
                       ],
@@ -138,35 +196,90 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 }
 
-class _AvgGrid extends StatelessWidget {
-  final Statistics stats;
-  const _AvgGrid({required this.stats});
+class _RangeSelector extends StatelessWidget {
+  final _Range range;
+  final ValueChanged<_Range> onChanged;
+  const _RangeSelector({required this.range, required this.onChanged});
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
+    String label(_Range r) => switch (r) {
+          _Range.today => s.today,
+          _Range.week => s.rangeWeek,
+          _Range.month => s.rangeMonth,
+          _Range.all => s.rangeAll,
+        };
+    return SizedBox(
+      width: double.infinity,
+      child: CupertinoSlidingSegmentedControl<_Range>(
+        groupValue: range,
+        backgroundColor: AppColors.divider.withValues(alpha: 0.6),
+        thumbColor: AppColors.surface,
+        onValueChanged: (r) {
+          if (r != null) {
+            HapticFeedback.selectionClick();
+            onChanged(r);
+          }
+        },
+        children: {
+          for (final r in _Range.values)
+            r: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                label(r),
+                style: AppText.footnote.copyWith(
+                  color: range == r
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                  fontWeight: range == r ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+        },
+      ),
+    );
+  }
+}
+
+class _AvgGrid extends StatelessWidget {
+  final Statistics stats;
+  final bool showSleep;
+  final bool showFeed;
+  const _AvgGrid({
+    required this.stats,
+    required this.showSleep,
+    required this.showFeed,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final tiles = <Widget>[
+      if (showSleep)
+        _AvgTile(
+          icon: CupertinoIcons.moon_fill,
+          accent: AppColors.sleepAccent,
+          softBg: AppColors.sleepSoft,
+          value: formatDuration(stats.avgDailySleep),
+          label: s.sleepPerDay,
+          sub: '${stats.avgSleepsPerDay.toStringAsFixed(1)} ${s.sessions}',
+        ),
+      if (showFeed)
+        _AvgTile(
+          icon: CupertinoIcons.drop_fill,
+          accent: AppColors.feedAccent,
+          softBg: AppColors.feedSoft,
+          value: formatDuration(stats.avgDailyFeed),
+          label: s.feedingPerDay,
+          sub: '${stats.avgFeedsPerDay.toStringAsFixed(1)} ${s.sessions}',
+        ),
+    ];
     return Row(
       children: [
-        Expanded(
-          child: _AvgTile(
-            icon: CupertinoIcons.moon_fill,
-            accent: AppColors.sleepAccent,
-            softBg: AppColors.sleepSoft,
-            value: formatDuration(stats.avgDailySleep),
-            label: s.sleepPerDay,
-            sub: '${stats.avgSleepsPerDay.toStringAsFixed(1)} ${s.sessions}',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _AvgTile(
-            icon: CupertinoIcons.drop_fill,
-            accent: AppColors.feedAccent,
-            softBg: AppColors.feedSoft,
-            value: formatDuration(stats.avgDailyFeed),
-            label: s.feedingPerDay,
-            sub: '${stats.avgFeedsPerDay.toStringAsFixed(1)} ${s.sessions}',
-          ),
-        ),
+        for (var i = 0; i < tiles.length; i++) ...[
+          if (i > 0) const SizedBox(width: 12),
+          Expanded(child: tiles[i]),
+        ],
       ],
     );
   }
@@ -251,7 +364,8 @@ class _DiaperAvgTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${stats.avgPeesPerDay.toStringAsFixed(1)} Pee  ${stats.avgPoopsPerDay.toStringAsFixed(1)} Poo',
+                  '${stats.avgPeesPerDay.toStringAsFixed(1)} ${S.of(context).pee}  '
+                  '${stats.avgPoopsPerDay.toStringAsFixed(1)} ${S.of(context).poop}',
                   style: AppText.caption,
                 ),
               ],
@@ -363,7 +477,13 @@ class _StatRow extends StatelessWidget {
 
 class _DailyRow extends StatelessWidget {
   final DailyStats d;
-  const _DailyRow({required this.d});
+  final bool showSleep;
+  final bool showFeed;
+  const _DailyRow({
+    required this.d,
+    required this.showSleep,
+    required this.showFeed,
+  });
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -379,21 +499,24 @@ class _DailyRow extends StatelessWidget {
               style: AppText.callout,
             ),
           ),
-          _Chip(
-            icon: CupertinoIcons.moon_fill,
-            text: formatDuration(d.sleepTotal),
-            sub: '×${d.sleepCount}',
-            accent: AppColors.sleepAccent,
-            softBg: AppColors.sleepSoft,
-          ),
-          const SizedBox(width: 8),
-          _Chip(
-            icon: CupertinoIcons.drop_fill,
-            text: formatDuration(d.feedTotal),
-            sub: '×${d.feedCount}',
-            accent: AppColors.feedAccent,
-            softBg: AppColors.feedSoft,
-          ),
+          if (showSleep) ...[
+            _Chip(
+              icon: CupertinoIcons.moon_fill,
+              text: formatDuration(d.sleepTotal),
+              sub: '×${d.sleepCount}',
+              accent: AppColors.sleepAccent,
+              softBg: AppColors.sleepSoft,
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (showFeed)
+            _Chip(
+              icon: CupertinoIcons.drop_fill,
+              text: formatDuration(d.feedTotal),
+              sub: '×${d.feedCount}',
+              accent: AppColors.feedAccent,
+              softBg: AppColors.feedSoft,
+            ),
           if (d.diaperCount > 0) ...[
             const SizedBox(width: 8),
             _Chip(

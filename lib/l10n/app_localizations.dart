@@ -169,8 +169,6 @@ class S {
       _t(en: 'Bottle', da: 'Flaske', nb: 'Flaske', sv: 'Flaska', fi: 'Pullo', isl: 'Pela');
   String get tube =>
       _t(en: 'Tube', da: 'Sonde', nb: 'Sonde', sv: 'Sond', fi: 'Letku', isl: 'Sonda');
-  String get logFeed =>
-      _t(en: 'Log', da: 'Log', nb: 'Logg', sv: 'Logga', fi: 'Kirjaa', isl: 'Skrá');
   String get tapToLog => _t(
       en: 'Tap to log',
       da: 'Tryk for at logge',
@@ -182,6 +180,65 @@ class S {
       _t(en: 'Amount', da: 'Mængde', nb: 'Mengde', sv: 'Mängd', fi: 'Määrä', isl: 'Magn');
   String get ml => 'ml';
   String amountMl(String n) => '$n ml';
+
+  /// Short "Add" action used on the quick-log card buttons (bottle/tube and
+  /// growth measurements).
+  String get add => _t(
+      en: 'Add', da: 'Tilføj', nb: 'Legg til', sv: 'Lägg till', fi: 'Lisää', isl: 'Bæta við');
+
+  // Growth measurements (weight / length / head circumference)
+  String get weight =>
+      _t(en: 'Weight', da: 'Vægt', nb: 'Vekt', sv: 'Vikt', fi: 'Paino', isl: 'Þyngd');
+  String get length =>
+      _t(en: 'Length', da: 'Længde', nb: 'Lengde', sv: 'Längd', fi: 'Pituus', isl: 'Lengd');
+  String get headCirc => _t(
+      en: 'Head',
+      da: 'Hovedomfang',
+      nb: 'Hodeomkrets',
+      sv: 'Huvudomfång',
+      fi: 'Päänympärys',
+      isl: 'Höfuðummál');
+  String get gramsUnit => 'g';
+  String get cmUnit => 'cm';
+  String get notMeasuredYet => _t(
+      en: 'Not measured yet',
+      da: 'Ikke målt endnu',
+      nb: 'Ikke målt ennå',
+      sv: 'Inte mätt än',
+      fi: 'Ei vielä mitattu',
+      isl: 'Ekki mælt enn');
+  /// "<value> <unit>" e.g. "4250 g" or "55 cm" — unit-agnostic across locales.
+  String measurementValue(String value, String unit) => '$value $unit';
+  /// Home-card subtitle for the last recorded measurement, e.g. "4250 g · 2d ago".
+  String lastMeasured(String value, String ago) => '$value · $ago';
+
+  // Tracker groups (Tilpas + the + sheet)
+  String get groupFood => _t(
+      en: 'Feeding', da: 'Mad', nb: 'Mat', sv: 'Mat', fi: 'Ruokailu', isl: 'Næring');
+  String get groupActivity => _t(
+      en: 'Activity',
+      da: 'Aktivitet',
+      nb: 'Aktivitet',
+      sv: 'Aktivitet',
+      fi: 'Toiminta',
+      isl: 'Virkni');
+  String get groupGrowth => _t(
+      en: 'Growth', da: 'Vækst', nb: 'Vekst', sv: 'Tillväxt', fi: 'Kasvu', isl: 'Vöxtur');
+
+  // Stats time ranges
+  String get rangeWeek =>
+      _t(en: 'Week', da: 'Uge', nb: 'Uke', sv: 'Vecka', fi: 'Viikko', isl: 'Vika');
+  String get rangeMonth => _t(
+      en: 'Month', da: 'Måned', nb: 'Måned', sv: 'Månad', fi: 'Kuukausi', isl: 'Mánuður');
+  String get rangeAll =>
+      _t(en: 'All', da: 'Alt', nb: 'Alt', sv: 'Allt', fi: 'Kaikki', isl: 'Allt');
+  String get noDataInRange => _t(
+      en: 'No data in this range yet.',
+      da: 'Ingen data i denne periode endnu.',
+      nb: 'Ingen data i denne perioden ennå.',
+      sv: 'Ingen data i denna period än.',
+      fi: 'Ei tietoja tällä ajanjaksolla vielä.',
+      isl: 'Engin gögn á þessu tímabili enn.');
 
   // Diaper
   String get diaper =>
@@ -798,6 +855,86 @@ class S {
       fi: 'Yksinkertainen ja tyylikäs vauvan unen ja ruokailun seuranta.',
       isl: 'Einfalt og glæsilegt forrit fyrir svefn og næringu barnsins.');
 
+  // Profile deletion
+  String get profileData => _t(
+      en: 'DATA & PRIVACY',
+      da: 'DATA & PRIVATLIV',
+      nb: 'DATA OG PERSONVERN',
+      sv: 'DATA & INTEGRITET',
+      fi: 'TIEDOT JA YKSITYISYYS',
+      isl: 'GÖGN OG FRIÐHELGI');
+  String get deleteProfile => _t(
+      en: 'Delete profile & data',
+      da: 'Slet profil og data',
+      nb: 'Slett profil og data',
+      sv: 'Radera profil och data',
+      fi: 'Poista profiili ja tiedot',
+      isl: 'Eyða notandasniði og gögnum');
+  String get deleteProfileSub => _t(
+      en: 'Permanently erase this profile and everything tracked.',
+      da: 'Slet permanent denne profil og alt det registrerede.',
+      nb: 'Slett permanent denne profilen og alt som er registrert.',
+      sv: 'Radera permanent denna profil och allt som registrerats.',
+      fi: 'Poista pysyvästi tämä profiili ja kaikki tallennettu.',
+      isl: 'Eyða varanlega þessu notandasniði og öllu skráðu.');
+  String get deleteProfileTitle => _t(
+      en: 'Delete profile & all data?',
+      da: 'Slet profil og alle data?',
+      nb: 'Slette profil og alle data?',
+      sv: 'Radera profil och all data?',
+      fi: 'Poistetaanko profiili ja kaikki tiedot?',
+      isl: 'Eyða notandasniði og öllum gögnum?');
+  String get deleteProfileMessage => _t(
+      en: 'This permanently deletes your profile and all tracked sleep, feeds, diapers and measurements for everyone sharing this baby. Your invite codes stop working and this cannot be undone.',
+      da: 'Dette sletter permanent din profil og alle registrerede data om søvn, mad, bleer og målinger for alle, der deler denne baby. Dine invitationskoder holder op med at virke, og det kan ikke fortrydes.',
+      nb: 'Dette sletter permanent profilen din og alle registrerte data om søvn, mating, bleier og målinger for alle som deler denne babyen. Invitasjonskodene dine slutter å virke, og dette kan ikke angres.',
+      sv: 'Detta raderar permanent din profil och all registrerad data om sömn, matning, blöjor och mätningar för alla som delar den här bebisen. Dina inbjudningskoder slutar fungera och det går inte att ångra.',
+      fi: 'Tämä poistaa pysyvästi profiilisi ja kaikki tallennetut uni-, ruokailu-, vaippa- ja mittaustiedot kaikilta, jotka jakavat tämän vauvan. Kutsukoodisi lakkaavat toimimasta, eikä tätä voi kumota.',
+      isl: 'Þetta eyðir varanlega notandasniðinu þínu og öllum skráðum svefn-, næringar-, bleyju- og mælingargögnum fyrir alla sem deila þessu barni. Boðskóðarnir þínir hætta að virka og ekki er hægt að afturkalla þetta.');
+  String get deleteProfileConfirm => _t(
+      en: 'Delete everything',
+      da: 'Slet alt',
+      nb: 'Slett alt',
+      sv: 'Radera allt',
+      fi: 'Poista kaikki',
+      isl: 'Eyða öllu');
+  // Caregiver variant: leaves the shared baby but keeps its data for the owner.
+  String get leaveProfile => _t(
+      en: 'Leave & delete profile',
+      da: 'Forlad og slet profil',
+      nb: 'Forlat og slett profil',
+      sv: 'Lämna och radera profil',
+      fi: 'Poistu ja poista profiili',
+      isl: 'Fara og eyða notandasniði');
+  String get leaveProfileSub => _t(
+      en: 'Leave this shared baby and erase your profile.',
+      da: 'Forlad denne delte baby, og slet din profil.',
+      nb: 'Forlat denne delte babyen og slett profilen din.',
+      sv: 'Lämna den här delade bebisen och radera din profil.',
+      fi: 'Poistu tästä jaetusta vauvasta ja poista profiilisi.',
+      isl: 'Farðu úr þessu deilda barni og eyddu notandasniðinu þínu.');
+  String get leaveProfileTitle => _t(
+      en: 'Leave & delete profile?',
+      da: 'Forlad og slet profil?',
+      nb: 'Forlate og slette profil?',
+      sv: 'Lämna och radera profil?',
+      fi: 'Poistutaanko ja poistetaanko profiili?',
+      isl: 'Fara og eyða notandasniði?');
+  String get leaveProfileMessage => _t(
+      en: "This removes you from this shared baby and permanently deletes your profile on this device. The baby's tracked data stays for the other caregivers. This cannot be undone.",
+      da: 'Dette fjerner dig fra denne delte baby og sletter permanent din profil på denne enhed. Babyens registrerede data forbliver hos de andre omsorgspersoner. Det kan ikke fortrydes.',
+      nb: 'Dette fjerner deg fra denne delte babyen og sletter profilen din permanent på denne enheten. Babyens registrerte data blir værende hos de andre omsorgspersonene. Dette kan ikke angres.',
+      sv: 'Detta tar bort dig från den här delade bebisen och raderar permanent din profil på den här enheten. Bebisens registrerade data stannar kvar hos de andra vårdgivarna. Det går inte att ångra.',
+      fi: 'Tämä poistaa sinut tästä jaetusta vauvasta ja poistaa pysyvästi profiilisi tältä laitteelta. Vauvan tallennetut tiedot säilyvät muilla hoitajilla. Tätä ei voi kumota.',
+      isl: 'Þetta fjarlægir þig úr þessu deilda barni og eyðir varanlega notandasniðinu þínu á þessu tæki. Skráð gögn barnsins haldast hjá hinum umönnunaraðilunum. Ekki er hægt að afturkalla þetta.');
+  String get leaveProfileConfirm => _t(
+      en: 'Leave & delete',
+      da: 'Forlad og slet',
+      nb: 'Forlat og slett',
+      sv: 'Lämna och radera',
+      fi: 'Poistu ja poista',
+      isl: 'Fara og eyða');
+
   // Caregivers / sharing
   String get inviteSectionTitle => _t(
       en: 'INVITE A CAREGIVER',
@@ -1065,6 +1202,230 @@ class S {
       prefix = DateFormat('EEE, MMM d', localeCode).format(t);
     }
     return '$prefix  ${DateFormat('HH:mm').format(t)}';
+  }
+
+  // ─── Onboarding & baby profile ──────────────────────────────────────────
+
+  String get onboardingSkip => _t(
+      en: 'Skip', da: 'Spring over', nb: 'Hopp over', sv: 'Hoppa över', fi: 'Ohita', isl: 'Sleppa');
+  String get onboardingContinue => _t(
+      en: 'Continue', da: 'Fortsæt', nb: 'Fortsett', sv: 'Fortsätt', fi: 'Jatka', isl: 'Halda áfram');
+
+  String get onboardingWelcomeTitle => _t(
+      en: 'Welcome, little one 💜',
+      da: 'Velkommen, lille skat 💜',
+      nb: 'Velkommen, lille venn 💜',
+      sv: 'Välkommen, lilla vän 💜',
+      fi: 'Tervetuloa, pikkuinen 💜',
+      isl: 'Velkomin, litla krútt 💜');
+  String get onboardingWelcomeBody => _t(
+      en: 'Naps 😴 feeds 🍼 and all the little moments — in one cozy place ✨',
+      da: 'Lure 😴 måltider 🍼 og alle de små øjeblikke — samlet ét hyggeligt sted ✨',
+      nb: 'Lurer 😴 måltider 🍼 og alle de små øyeblikkene — samlet på ett koselig sted ✨',
+      sv: 'Tupplurar 😴 mat 🍼 och alla små ögonblick — samlade på ett mysigt ställe ✨',
+      fi: 'Unet 😴 syötöt 🍼 ja kaikki pienet hetket — yhdessä kodikkaassa paikassa ✨',
+      isl: 'Blundar 😴 gjafir 🍼 og öll litlu augnablikin — á einum notalegum stað ✨');
+
+  String get onboardingNameTitle => _t(
+      en: 'What’s your baby’s name?',
+      da: 'Hvad hedder din baby?',
+      nb: 'Hva heter babyen din?',
+      sv: 'Vad heter din bebis?',
+      fi: 'Mikä on vauvasi nimi?',
+      isl: 'Hvað heitir barnið þitt?');
+  String get onboardingNamePlaceholder => _t(
+      en: 'Baby’s name',
+      da: 'Babyens navn',
+      nb: 'Babyens navn',
+      sv: 'Bebisens namn',
+      fi: 'Vauvan nimi',
+      isl: 'Nafn barnsins');
+
+  String get onboardingBirthTitle => _t(
+      en: 'When was your baby born?',
+      da: 'Hvornår blev din baby født?',
+      nb: 'Når ble babyen din født?',
+      sv: 'När föddes din bebis?',
+      fi: 'Milloin vauvasi syntyi?',
+      isl: 'Hvenær fæddist barnið þitt?');
+  String onboardingBirthTitleNamed(String name) => _t(
+      en: 'When was $name born?',
+      da: 'Hvornår blev $name født?',
+      nb: 'Når ble $name født?',
+      sv: 'När föddes $name?',
+      fi: 'Milloin $name syntyi?',
+      isl: 'Hvenær fæddist $name?');
+
+  String get onboardingSexTitle => _t(
+      en: 'Boy or girl?',
+      da: 'Dreng eller pige?',
+      nb: 'Gutt eller jente?',
+      sv: 'Pojke eller flicka?',
+      fi: 'Poika vai tyttö?',
+      isl: 'Strákur eða stelpa?');
+  String get sexBoy => _t(
+      en: 'Boy', da: 'Dreng', nb: 'Gutt', sv: 'Pojke', fi: 'Poika', isl: 'Strákur');
+  String get sexGirl => _t(
+      en: 'Girl', da: 'Pige', nb: 'Jente', sv: 'Flicka', fi: 'Tyttö', isl: 'Stelpa');
+
+  String get onboardingFeedingTitle => _t(
+      en: 'How do you feed?',
+      da: 'Hvordan fodrer du?',
+      nb: 'Hvordan mater du?',
+      sv: 'Hur matar du?',
+      fi: 'Miten ruokit?',
+      isl: 'Hvernig nærirðu?');
+  String get onboardingFeedingBody => _t(
+      en: 'We’ll show the right feed trackers. You can change this anytime.',
+      da: 'Vi viser de rette mad-trackere. Du kan ændre det når som helst.',
+      nb: 'Vi viser de riktige mat-sporerne. Du kan endre det når som helst.',
+      sv: 'Vi visar rätt matspårare. Du kan ändra det när som helst.',
+      fi: 'Näytämme oikeat ruokailun seurannat. Voit muuttaa tätä milloin tahansa.',
+      isl: 'Við sýnum réttu næringar-mælana. Þú getur breytt þessu hvenær sem er.');
+  String get feedingBreast => _t(
+      en: 'Breast', da: 'Bryst', nb: 'Bryst', sv: 'Bröst', fi: 'Rinta', isl: 'Brjóst');
+  String get feedingBottle => _t(
+      en: 'Bottle', da: 'Flaske', nb: 'Flaske', sv: 'Flaska', fi: 'Pullo', isl: 'Pela');
+  String get feedingMixed => _t(
+      en: 'Mixed', da: 'Blandet', nb: 'Blandet', sv: 'Blandat', fi: 'Sekä että', isl: 'Blandað');
+
+  String get onboardingTrackTitle => _t(
+      en: 'What do you want to track?',
+      da: 'Hvad vil du spore?',
+      nb: 'Hva vil du spore?',
+      sv: 'Vad vill du spåra?',
+      fi: 'Mitä haluat seurata?',
+      isl: 'Hvað viltu skrá?');
+  String get onboardingTrackBody => _t(
+      en: 'Pick what shows on your home screen — you can change it anytime.',
+      da: 'Vælg hvad der vises på din startskærm — du kan ændre det når som helst.',
+      nb: 'Velg hva som vises på startskjermen — du kan endre det når som helst.',
+      sv: 'Välj vad som visas på startskärmen — du kan ändra det när som helst.',
+      fi: 'Valitse mitä aloitusnäytöllä näkyy — voit muuttaa sitä milloin tahansa.',
+      isl: 'Veldu hvað birtist á heimaskjánum — þú getur breytt því hvenær sem er.');
+
+  String get onboardingMeasureTitle => _t(
+      en: 'Birth measurements',
+      da: 'Mål ved fødslen',
+      nb: 'Mål ved fødsel',
+      sv: 'Mått vid födseln',
+      fi: 'Syntymämitat',
+      isl: 'Mælingar við fæðingu');
+  String get onboardingMeasureBody => _t(
+      en: 'Optional — a great first point for growth charts.',
+      da: 'Valgfrit — et godt første punkt til vækstkurver.',
+      nb: 'Valgfritt — et fint første punkt for vekstkurver.',
+      sv: 'Valfritt — en bra första punkt för tillväxtkurvor.',
+      fi: 'Valinnainen — hyvä ensimmäinen piste kasvukäyrille.',
+      isl: 'Valfrjálst — góður fyrsti punktur fyrir vaxtarkúrfur.');
+  String get measureWeight => _t(
+      en: 'Weight', da: 'Vægt', nb: 'Vekt', sv: 'Vikt', fi: 'Paino', isl: 'Þyngd');
+  String get measureLength => _t(
+      en: 'Length', da: 'Længde', nb: 'Lengde', sv: 'Längd', fi: 'Pituus', isl: 'Lengd');
+  String get measureHead => _t(
+      en: 'Head', da: 'Hoved', nb: 'Hode', sv: 'Huvud', fi: 'Pää', isl: 'Höfuð');
+
+  String get onboardingDoneTitle => _t(
+      en: 'You’re all set!',
+      da: 'Så er du klar!',
+      nb: 'Alt er klart!',
+      sv: 'Allt är klart!',
+      fi: 'Kaikki valmista!',
+      isl: 'Allt tilbúið!');
+  String get onboardingDoneBody => _t(
+      en: 'Everything’s ready — let’s start tracking.',
+      da: 'Alt er klar — lad os begynde at spore.',
+      nb: 'Alt er klart — la oss begynne å spore.',
+      sv: 'Allt är klart — nu börjar vi spåra.',
+      fi: 'Kaikki valmista — aloitetaan seuranta.',
+      isl: 'Allt tilbúið — byrjum að skrá.');
+  String get onboardingStart => _t(
+      en: 'Start tracking',
+      da: 'Begynd at spore',
+      nb: 'Begynn å spore',
+      sv: 'Börja spåra',
+      fi: 'Aloita seuranta',
+      isl: 'Byrja að skrá');
+
+  // Profile — baby section
+  String get profileBaby => _t(
+      en: 'Baby', da: 'Baby', nb: 'Baby', sv: 'Bebis', fi: 'Vauva', isl: 'Barn');
+  String get profileFinishSetup => _t(
+      en: 'Finish setting up',
+      da: 'Færdiggør opsætning',
+      nb: 'Fullfør oppsett',
+      sv: 'Slutför inställningen',
+      fi: 'Viimeistele määritys',
+      isl: 'Ljúka uppsetningu');
+  String get profileFinishSetupSub => _t(
+      en: 'Add your baby’s details',
+      da: 'Tilføj din babys oplysninger',
+      nb: 'Legg til babyens detaljer',
+      sv: 'Lägg till din bebis uppgifter',
+      fi: 'Lisää vauvan tiedot',
+      isl: 'Bættu við upplýsingum barnsins');
+  String get profileBabyDetails => _t(
+      en: 'Baby profile',
+      da: 'Babyprofil',
+      nb: 'Babyprofil',
+      sv: 'Bebisprofil',
+      fi: 'Vauvan profiili',
+      isl: 'Barnaprófíll');
+  String get profileAddDetails => _t(
+      en: 'Add details',
+      da: 'Tilføj oplysninger',
+      nb: 'Legg til detaljer',
+      sv: 'Lägg till uppgifter',
+      fi: 'Lisää tiedot',
+      isl: 'Bæta við upplýsingum');
+
+  // Age — a compact "how old" label derived from the birth date.
+  String get ageNewborn => _t(
+      en: 'Newborn', da: 'Nyfødt', nb: 'Nyfødt', sv: 'Nyfödd', fi: 'Vastasyntynyt', isl: 'Nýfætt');
+  String _ageDays(int n) => _t(
+      en: '$n ${n == 1 ? 'day' : 'days'}',
+      da: '$n ${n == 1 ? 'dag' : 'dage'}',
+      nb: '$n ${n == 1 ? 'dag' : 'dager'}',
+      sv: '$n ${n == 1 ? 'dag' : 'dagar'}',
+      fi: '$n ${n == 1 ? 'päivä' : 'päivää'}',
+      isl: '$n ${n == 1 ? 'dagur' : 'dagar'}');
+  String _ageWeeks(int n) => _t(
+      en: '$n ${n == 1 ? 'week' : 'weeks'}',
+      da: '$n ${n == 1 ? 'uge' : 'uger'}',
+      nb: '$n ${n == 1 ? 'uke' : 'uker'}',
+      sv: '$n ${n == 1 ? 'vecka' : 'veckor'}',
+      fi: '$n ${n == 1 ? 'viikko' : 'viikkoa'}',
+      isl: '$n ${n == 1 ? 'vika' : 'vikur'}');
+  String _ageMonths(int n) => _t(
+      en: '$n ${n == 1 ? 'month' : 'months'}',
+      da: '$n ${n == 1 ? 'måned' : 'måneder'}',
+      nb: '$n ${n == 1 ? 'måned' : 'måneder'}',
+      sv: '$n ${n == 1 ? 'månad' : 'månader'}',
+      fi: '$n ${n == 1 ? 'kuukausi' : 'kuukautta'}',
+      isl: '$n ${n == 1 ? 'mánuður' : 'mánuðir'}');
+  String _ageYears(int n) => _t(
+      en: '$n ${n == 1 ? 'year' : 'years'}',
+      da: '$n år',
+      nb: '$n år',
+      sv: '$n år',
+      fi: '$n ${n == 1 ? 'vuosi' : 'vuotta'}',
+      isl: '$n ár');
+
+  /// A short, friendly age label ("Newborn", "5 days", "3 weeks", "4 months",
+  /// "2 years"). Returns an empty string for a future date.
+  String formatAge(DateTime birth) {
+    final now = DateTime.now();
+    final birthDay = DateTime(birth.year, birth.month, birth.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final days = today.difference(birthDay).inDays;
+    if (days < 0) return '';
+    if (days == 0) return ageNewborn;
+    if (days < 14) return _ageDays(days);
+    if (days < 70) return _ageWeeks(days ~/ 7);
+    var months = (now.year - birth.year) * 12 + (now.month - birth.month);
+    if (now.day < birth.day) months -= 1;
+    if (months < 24) return _ageMonths(months);
+    return _ageYears(months ~/ 12);
   }
 }
 

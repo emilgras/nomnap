@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart'
     show ReorderableListView, ReorderableDragStartListener, Material, MaterialType;
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/tracker_kind.dart';
@@ -11,7 +10,7 @@ import '../services/feedback_service.dart';
 import '../services/home_config.dart';
 import '../services/session_scope.dart';
 import '../theme/app_theme.dart';
-import '../widgets/app_icons.dart';
+import '../widgets/tracker_visuals.dart';
 
 /// Bottom sheet to show/hide and reorder the home-page trackers.
 class CustomizeHomeSheet extends StatefulWidget {
@@ -46,9 +45,10 @@ class _CustomizeHomeSheetState extends State<CustomizeHomeSheet> {
         top: false,
         child: Padding(
           padding: EdgeInsets.only(bottom: bottomInset > 0 ? 0 : 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.82,
+            child: Column(
+              children: [
               // Header row: title + Done.
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
@@ -82,16 +82,15 @@ class _CustomizeHomeSheetState extends State<CustomizeHomeSheet> {
               // Listen to the config so switch positions and order update
               // live as the user edits. Cap the height so a long list (many
               // trackers) scrolls instead of overflowing the screen.
-              ListenableBuilder(
-                listenable: config,
-                builder: (context, _) {
-                  final order = config.order;
-                  return ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(context).size.height * 0.55,
-                    ),
-                    child: ReorderableListView.builder(
-                      shrinkWrap: true,
+              // A single flat, freely-reorderable list — drag any tracker
+              // anywhere so the user can arrange the home page exactly as they
+              // like (no fixed category grouping).
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: config,
+                  builder: (context, _) {
+                    final order = config.order;
+                    return ReorderableListView.builder(
                       buildDefaultDragHandles: false,
                       proxyDecorator: _liftedRowDecorator,
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -102,8 +101,7 @@ class _CustomizeHomeSheetState extends State<CustomizeHomeSheet> {
                       },
                       itemBuilder: (context, i) {
                         final setting = order[i];
-                        final hasOptions =
-                            _optionsFor(setting.kind).isNotEmpty;
+                        final hasOptions = _optionsFor(setting.kind).isNotEmpty;
                         return _TrackerRow(
                           key: ValueKey(setting.kind),
                           index: i,
@@ -119,18 +117,19 @@ class _CustomizeHomeSheetState extends State<CustomizeHomeSheet> {
                               : null,
                         );
                       },
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
               // "Missing one?" — invite the user to suggest a tracker we'll add.
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
                 child: _SuggestTrackerCard(
                   onTap: () => SuggestTrackerSheet.show(context),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -279,7 +278,7 @@ class _TrackerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visuals = _trackerVisuals(kind);
+    final visuals = trackerVisuals(kind);
     final name = visuals.name(S.of(context));
 
     // The icon + name (+ chevron) is the tap target for configurable
@@ -359,69 +358,6 @@ class _TrackerRow extends StatelessWidget {
   }
 }
 
-class _TrackerVisuals {
-  final Color accent;
-  final Color softBg;
-  final Widget icon;
-  final String Function(S) name;
-  const _TrackerVisuals({
-    required this.accent,
-    required this.softBg,
-    required this.icon,
-    required this.name,
-  });
-}
-
-_TrackerVisuals _trackerVisuals(TrackerKind kind) {
-  switch (kind) {
-    case TrackerKind.sleep:
-      return _TrackerVisuals(
-        accent: AppColors.sleepAccent,
-        softBg: AppColors.sleepSoft,
-        icon: const Icon(CupertinoIcons.moon_fill,
-            color: AppColors.sleepAccent, size: 18),
-        name: (s) => s.sleep,
-      );
-    case TrackerKind.feed:
-      return _TrackerVisuals(
-        accent: AppColors.feedAccent,
-        softBg: AppColors.feedSoft,
-        icon: const Icon(CupertinoIcons.drop_fill,
-            color: AppColors.feedAccent, size: 18),
-        name: (s) => s.feed,
-      );
-    case TrackerKind.bottle:
-      return _TrackerVisuals(
-        accent: AppColors.bottleAccent,
-        softBg: AppColors.bottleSoft,
-        icon: const BottleIcon(color: AppColors.bottleAccent, size: 16),
-        name: (s) => s.bottle,
-      );
-    case TrackerKind.tube:
-      return _TrackerVisuals(
-        accent: AppColors.tubeAccent,
-        softBg: AppColors.tubeSoft,
-        icon: const TubeIcon(color: AppColors.tubeAccent, size: 16),
-        name: (s) => s.tube,
-      );
-    case TrackerKind.diaper:
-      return _TrackerVisuals(
-        accent: AppColors.diaperAccent,
-        softBg: AppColors.diaperSoft,
-        icon: Center(
-          child: SvgPicture.asset(
-            'assets/icons/poop.svg',
-            width: 18,
-            height: 18,
-            colorFilter: const ColorFilter.mode(
-                AppColors.diaperAccent, BlendMode.srcIn),
-          ),
-        ),
-        name: (s) => s.diaper,
-      );
-  }
-}
-
 /// A single configurable boolean option for a tracker.
 class _OptionDef {
   final String key;
@@ -440,6 +376,9 @@ List<_OptionDef> _optionsFor(TrackerKind kind) {
       return [_OptionDef('trackAmount', (s) => s.trackAmount, true)];
     case TrackerKind.sleep:
     case TrackerKind.feed:
+    case TrackerKind.weight:
+    case TrackerKind.length:
+    case TrackerKind.head:
       return const [];
   }
 }
@@ -729,7 +668,7 @@ class TrackerOptionsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final visuals = _trackerVisuals(kind);
+    final visuals = trackerVisuals(kind);
     final options = _optionsFor(kind);
     final bottomInset = MediaQuery.of(context).padding.bottom;
 

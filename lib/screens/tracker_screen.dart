@@ -16,6 +16,7 @@ import '../services/home_config.dart';
 import '../services/statistics.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_icons.dart';
+import '../widgets/async_action.dart';
 import '../widgets/format.dart';
 import '../widgets/section_card.dart';
 import 'add_entry_sheet.dart';
@@ -38,8 +39,14 @@ class _TrackerScreenState extends State<TrackerScreen> {
   void initState() {
     super.initState();
     widget.store.addListener(_onStoreChanged);
+    // Only repaint each second when there's a live elapsed timer to advance
+    // (an ongoing sleep/feed). When nothing is running this would otherwise
+    // rebuild the whole screen — and recompute Statistics — once a second for
+    // no visible change.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (mounted && (widget.store.isSleeping || widget.store.isFeeding)) {
+        setState(() {});
+      }
     });
   }
 
@@ -55,34 +62,41 @@ class _TrackerScreenState extends State<TrackerScreen> {
   Future<void> _toggleSleep() async {
     final type =
         widget.store.isSleeping ? EventType.sleepEnd : EventType.sleepStart;
-    await widget.store.add(type);
-    unawaited(HapticFeedback.mediumImpact());
+    final ok = await runGuarded(context, () => widget.store.add(type));
+    if (ok) unawaited(HapticFeedback.mediumImpact());
   }
 
   Future<void> _startFeed(String side) async {
-    await widget.store.add(EventType.feedStart, meta: {'side': side});
-    unawaited(HapticFeedback.mediumImpact());
+    final ok = await runGuarded(
+        context, () => widget.store.add(EventType.feedStart, meta: {'side': side}));
+    if (ok) unawaited(HapticFeedback.mediumImpact());
   }
 
   Future<void> _stopFeed() async {
-    await widget.store.add(EventType.feedEnd);
-    unawaited(HapticFeedback.mediumImpact());
+    final ok =
+        await runGuarded(context, () => widget.store.add(EventType.feedEnd));
+    if (ok) unawaited(HapticFeedback.mediumImpact());
   }
 
-  Future<void> _logDiaper(EventType type, {String? size}) async {
-    await widget.store.add(
-      type,
-      meta: size != null ? {'size': size} : null,
+  /// Returns true if the diaper event was logged, so the card only flashes its
+  /// confirmation checkmark on a real success.
+  Future<bool> _logDiaper(EventType type, {String? size}) async {
+    final ok = await runGuarded(
+      context,
+      () => widget.store.add(type, meta: size != null ? {'size': size} : null),
     );
-    unawaited(HapticFeedback.mediumImpact());
+    if (ok) unawaited(HapticFeedback.mediumImpact());
+    return ok;
   }
 
-  Future<void> _logQuickFeed(EventType type, {String? amount}) async {
-    await widget.store.add(
-      type,
-      meta: amount != null ? {'amount': amount} : null,
+  Future<bool> _logQuickFeed(EventType type, {String? amount}) async {
+    final ok = await runGuarded(
+      context,
+      () =>
+          widget.store.add(type, meta: amount != null ? {'amount': amount} : null),
     );
-    unawaited(HapticFeedback.mediumImpact());
+    if (ok) unawaited(HapticFeedback.mediumImpact());
+    return ok;
   }
 
   /// Builds the enabled tracker cards in configured order, with 12px gaps.
@@ -635,7 +649,7 @@ class _FeedCard extends StatelessWidget {
 class _DiaperCard extends StatefulWidget {
   final bool trackSize;
   final String? idleDetail;
-  final Future<void> Function(EventType, {String? size}) onLog;
+  final Future<bool> Function(EventType, {String? size}) onLog;
   const _DiaperCard({
     required this.trackSize,
     this.idleDetail,
@@ -656,8 +670,9 @@ class _DiaperCardState extends State<_DiaperCard> {
       size = await _pickSize(type);
       if (size == null) return; // cancelled
     }
+    final ok = await widget.onLog(type, size: size);
+    if (!ok || !mounted) return;
     setState(() => _confirmed = type == EventType.diaperPee ? 'pee' : 'poop');
-    await widget.onLog(type, size: size);
     await Future.delayed(const Duration(milliseconds: 600));
     if (mounted) setState(() => _confirmed = null);
   }
@@ -805,7 +820,7 @@ class _QuickFeedCard extends StatefulWidget {
   final Color softBg;
   final bool trackAmount;
   final String? idleDetail;
-  final Future<void> Function(String? amount) onLog;
+  final Future<bool> Function(String? amount) onLog;
 
   const _QuickFeedCard({
     required this.title,
@@ -830,8 +845,9 @@ class _QuickFeedCardState extends State<_QuickFeedCard> {
       amount = await FeedAmountSheet.show(context, accent: widget.accent);
       if (amount == null) return; // cancelled
     }
+    final ok = await widget.onLog(amount);
+    if (!ok || !mounted) return;
     setState(() => _confirmed = true);
-    await widget.onLog(amount);
     await Future.delayed(const Duration(milliseconds: 600));
     if (mounted) setState(() => _confirmed = false);
   }

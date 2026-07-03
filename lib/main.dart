@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -20,6 +22,18 @@ import 'services/session_scope.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
+  // Run everything inside a guarded zone so that even errors thrown outside the
+  // Flutter framework's own callbacks (async gaps, stream listeners) are caught
+  // and reported instead of silently terminating the isolate.
+  runZonedGuarded(_bootstrap, (error, stack) {
+    FlutterError.presentError(
+      FlutterErrorDetails(exception: error, stack: stack),
+    );
+    unawaited(_reportError(error, stack, fatal: true));
+  });
+}
+
+Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await initializeDateFormatting('da');
@@ -34,6 +48,25 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // Route uncaught framework + platform errors to Crashlytics so we have
+    // visibility into failures in the field. Disabled in debug to keep noise
+    // out of the dashboard. Wrapped so a Crashlytics hiccup can never block
+    // startup.
+    try {
+      await FirebaseCrashlytics.instance
+          .setCrashlyticsCollectionEnabled(!kDebugMode);
+    } catch (_) {/* non-fatal */}
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      if (!kDebugMode) {
+        FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      }
+    };
+    WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+      unawaited(_reportError(error, stack, fatal: true));
+      return true;
+    };
 
     // Silent anonymous account → stable uid for membership/rules.
     final auth = AuthService();
@@ -53,10 +86,24 @@ Future<void> main() async {
       initialHouseholdId: householdId,
       households: households,
     ));
-  } catch (e) {
+  } catch (e, stack) {
     // First launch needs connectivity to create the anonymous account; if that
     // fails we show a recoverable message rather than crashing.
+    unawaited(_reportError(e, stack, fatal: false));
     runApp(_StartupErrorApp(localeProvider: localeProvider, error: e));
+  }
+}
+
+/// Records an error to Crashlytics when collection is available. Guarded so a
+/// reporting failure (e.g. Crashlytics not yet initialized) never masks the
+/// original error.
+Future<void> _reportError(Object error, StackTrace? stack,
+    {required bool fatal}) async {
+  if (kDebugMode) return;
+  try {
+    await FirebaseCrashlytics.instance.recordError(error, stack, fatal: fatal);
+  } catch (_) {
+    // Nothing more we can do; the error was already surfaced to the console.
   }
 }
 

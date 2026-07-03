@@ -59,12 +59,20 @@ class HomeConfig extends ChangeNotifier {
     ];
   }
 
+  /// Writes the layout to local storage. The in-memory state and listeners are
+  /// already updated by the caller, so a persistence failure is swallowed (and
+  /// logged in debug) rather than thrown as an unhandled async error from a UI
+  /// callback — the worst case is the change not surviving a restart.
   Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _storageKey,
-      jsonEncode(_order.map((s) => s.toJson()).toList()),
-    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _storageKey,
+        jsonEncode(_order.map((s) => s.toJson()).toList()),
+      );
+    } catch (e) {
+      debugPrint('HomeConfig: failed to persist layout: $e');
+    }
   }
 
   Future<void> setDayStartHour(int hour) async {
@@ -72,8 +80,12 @@ class HomeConfig extends ChangeNotifier {
     if (clamped == _dayStartHour) return;
     _dayStartHour = clamped;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_dayStartKey, clamped);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_dayStartKey, clamped);
+    } catch (e) {
+      debugPrint('HomeConfig: failed to persist day-start hour: $e');
+    }
   }
 
   Future<void> setEnabled(TrackerKind kind, bool enabled) async {

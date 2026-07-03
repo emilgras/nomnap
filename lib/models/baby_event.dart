@@ -43,9 +43,19 @@ extension EventTypeX on EventType {
   /// Point-in-time events that show as single timeline rows (not sessions).
   bool get isPointEvent => isDiaper || isInstantFeed;
 
-  static EventType fromId(String id) {
-    return EventType.values.firstWhere((e) => e.id == id);
+  /// Resolves an id, returning null for an unknown one (e.g. a forward-compat
+  /// event written by a newer client) so callers can skip it instead of
+  /// throwing and poisoning the whole event stream.
+  static EventType? fromIdOrNull(String? id) {
+    if (id == null) return null;
+    for (final e in EventType.values) {
+      if (e.id == id) return e;
+    }
+    return null;
   }
+
+  static EventType fromId(String id) =>
+      fromIdOrNull(id) ?? (throw FormatException('Unknown event type: $id'));
 }
 
 class BabyEvent {
@@ -91,8 +101,14 @@ class BabyEvent {
 
   static List<BabyEvent> decodeList(String raw) {
     final list = jsonDecode(raw) as List<dynamic>;
-    return list
-        .map((e) => BabyEvent.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final result = <BabyEvent>[];
+    for (final e in list) {
+      // Skip any corrupt/forward-incompatible entry rather than aborting the
+      // whole import (used for legacy migration and backup restore).
+      try {
+        result.add(BabyEvent.fromJson(e as Map<String, dynamic>));
+      } catch (_) {}
+    }
+    return result;
   }
 }

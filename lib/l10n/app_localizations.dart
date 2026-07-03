@@ -933,6 +933,20 @@ class S {
       sv: 'Kunde inte uppdatera. Kontrollera din anslutning.',
       fi: 'Päivitys epäonnistui. Tarkista yhteytesi.',
       isl: 'Tókst ekki að uppfæra. Athugaðu tenginguna.');
+  String get errSave => _t(
+      en: "Couldn't save. Check your connection and try again.",
+      da: 'Kunne ikke gemme. Tjek din forbindelse og prøv igen.',
+      nb: 'Kunne ikke lagre. Sjekk tilkoblingen og prøv igjen.',
+      sv: 'Kunde inte spara. Kontrollera din anslutning och försök igen.',
+      fi: 'Tallennus epäonnistui. Tarkista yhteytesi ja yritä uudelleen.',
+      isl: 'Tókst ekki að vista. Athugaðu tenginguna og reyndu aftur.');
+  String get errLoadCaregivers => _t(
+      en: "Couldn't load caregivers. Check your connection.",
+      da: 'Kunne ikke indlæse omsorgspersoner. Tjek din forbindelse.',
+      nb: 'Kunne ikke laste omsorgspersoner. Sjekk tilkoblingen din.',
+      sv: 'Kunde inte ladda vårdgivare. Kontrollera din anslutning.',
+      fi: 'Hoitajien lataaminen epäonnistui. Tarkista yhteytesi.',
+      isl: 'Tókst ekki að hlaða umönnunaraðilum. Athugaðu tenginguna.');
   String get errInviteNotFound => _t(
       en: 'This invite code does not exist.',
       da: 'Denne invitationskode findes ikke.',

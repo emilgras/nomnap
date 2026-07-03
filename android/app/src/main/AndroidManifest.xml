@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required by Firebase Auth / Firestore. Flutter only injects this into
+         the debug/profile manifests, so release builds need it declared here
+         explicitly or the app has no network and can never reach Firebase. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="NomNap"
         android:name="${applicationName}"

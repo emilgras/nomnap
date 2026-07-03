@@ -7,6 +7,7 @@ import '../services/event_store.dart';
 import '../services/home_config.dart';
 import '../services/statistics.dart' show dayKeyFor;
 import '../theme/app_theme.dart';
+import '../widgets/async_action.dart';
 import '../widgets/section_card.dart';
 import '../widgets/sticky_header.dart';
 import '../widgets/wakeup_refresh.dart';
@@ -67,8 +68,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
     );
-    if (confirmed == true) {
-      await widget.store.clearAll();
+    if (confirmed == true && mounted) {
+      await runGuarded(context, () => widget.store.clearAll(),
+          errorMessage: s.errUpdate);
     }
   }
 
@@ -143,8 +145,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       initial: session.start,
       max: session.end ?? DateTime.now(),
     );
-    if (picked != null) {
-      await widget.store.editSession(session, newStart: picked);
+    if (picked != null && mounted) {
+      await runGuarded(
+          context, () => widget.store.editSession(session, newStart: picked),
+          errorMessage: S.of(context).errUpdate);
     }
   }
 
@@ -155,13 +159,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
       initial: session.end!,
       min: session.start,
     );
-    if (picked != null) {
-      await widget.store.editSession(session, newEnd: picked);
+    if (picked != null && mounted) {
+      await runGuarded(
+          context, () => widget.store.editSession(session, newEnd: picked),
+          errorMessage: S.of(context).errUpdate);
     }
   }
 
   Future<void> _endNow(BabySession session) async {
-    await widget.store.endOngoingSession(session);
+    await runGuarded(context, () => widget.store.endOngoingSession(session),
+        errorMessage: S.of(context).errUpdate);
   }
 
   Future<void> _confirmDelete(BabySession session) async {
@@ -183,8 +190,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
     );
-    if (confirmed == true) {
-      await widget.store.deleteSession(session);
+    if (confirmed == true && mounted) {
+      await runGuarded(context, () => widget.store.deleteSession(session),
+          errorMessage: s.errUpdate);
     }
   }
 
@@ -193,8 +201,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       title: S.of(context).editTime,
       initial: event.timestamp,
     );
-    if (picked != null) {
-      await widget.store.update(event.id, picked);
+    if (picked != null && mounted) {
+      await runGuarded(context, () => widget.store.update(event.id, picked),
+          errorMessage: S.of(context).errUpdate);
     }
   }
 
@@ -219,8 +228,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
     );
-    if (confirmed == true) {
-      await widget.store.remove(event.id);
+    if (confirmed == true && mounted) {
+      await runGuarded(context, () => widget.store.remove(event.id),
+          errorMessage: s.errUpdate);
     }
   }
 
@@ -280,7 +290,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _switchFeedSide(BabySession session) async {
     final newSide = session.side == 'L' ? 'R' : 'L';
-    await widget.store.updateMeta(session.startEventId, {'side': newSide});
+    await runGuarded(
+        context,
+        () => widget.store.updateMeta(session.startEventId, {'side': newSide}),
+        errorMessage: S.of(context).errUpdate);
   }
 
   void _openRowMenu(BabySession session) {

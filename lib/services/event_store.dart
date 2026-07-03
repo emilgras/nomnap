@@ -43,7 +43,7 @@ class EventStore extends ChangeNotifier {
       (snap) {
         _events
           ..clear()
-          ..addAll(snap.docs.map(_fromDoc));
+          ..addAll(snap.docs.map(_fromDoc).whereType<BabyEvent>());
         _sort();
         settle();
       },
@@ -58,19 +58,28 @@ class EventStore extends ChangeNotifier {
     super.dispose();
   }
 
-  BabyEvent _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    final ts = data['ts'];
-    final timestamp = ts is Timestamp
-        ? ts.toDate().toLocal()
-        : DateTime.parse(ts as String).toLocal();
-    return BabyEvent(
-      id: doc.id,
-      type: EventTypeX.fromId(data['type'] as String),
-      timestamp: timestamp,
-      meta: (data['meta'] as Map<String, dynamic>?)
-          ?.map((k, v) => MapEntry(k, v as String)),
-    );
+  /// Maps a Firestore doc to a [BabyEvent], or null if it can't be parsed
+  /// (unknown type from a newer client, malformed timestamp). Returning null
+  /// keeps one bad document from breaking the entire snapshot for everyone.
+  BabyEvent? _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    try {
+      final data = doc.data();
+      final type = EventTypeX.fromIdOrNull(data['type'] as String?);
+      if (type == null) return null;
+      final ts = data['ts'];
+      final timestamp = ts is Timestamp
+          ? ts.toDate().toLocal()
+          : DateTime.parse(ts as String).toLocal();
+      return BabyEvent(
+        id: doc.id,
+        type: type,
+        timestamp: timestamp,
+        meta: (data['meta'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, v as String)),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Map<String, dynamic> _toDoc(BabyEvent e) => {

@@ -76,7 +76,17 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
       });
       HapticFeedback.mediumImpact();
       final type = _isPoop ? EventType.diaperPoop : EventType.diaperPee;
-      await widget.store.add(type, at: _start);
+      try {
+        await widget.store.add(type, at: _start);
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _saving = false;
+            _error = s.errSave;
+          });
+        }
+        return;
+      }
       if (mounted) Navigator.of(context).pop();
       return;
     }
@@ -106,18 +116,28 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
         ? EventType.sleepStart
         : EventType.feedStart;
     final feedMeta = _kind == _Kind.feed ? {'side': _feedSide} : null;
-    if (_ongoing) {
-      await widget.store.add(startType, at: _start, meta: feedMeta);
-    } else {
-      final endType =
-          _kind == _Kind.sleep ? EventType.sleepEnd : EventType.feedEnd;
-      await widget.store.addSession(
-        startType: startType,
-        endType: endType,
-        start: _start,
-        end: _end,
-        startMeta: feedMeta,
-      );
+    try {
+      if (_ongoing) {
+        await widget.store.add(startType, at: _start, meta: feedMeta);
+      } else {
+        final endType =
+            _kind == _Kind.sleep ? EventType.sleepEnd : EventType.feedEnd;
+        await widget.store.addSession(
+          startType: startType,
+          endType: endType,
+          start: _start,
+          end: _end,
+          startMeta: feedMeta,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = s.errSave;
+        });
+      }
+      return;
     }
     if (mounted) Navigator.of(context).pop();
   }

@@ -74,14 +74,25 @@ class Statistics {
     return sessions;
   }
 
+  // A Statistics instance is built fresh and immutable per screen build, but
+  // its getters are read many times within one build (the stats screen reads a
+  // dozen). Memoize the expensive intermediates so each is computed at most
+  // once per instance.
+  List<Session>? _sleepCache;
+  List<Session>? _feedCache;
+  Map<DateTime, DailyStats>? _byDayCache;
+  List<DailyStats>? _dailyStatsCache;
+
   List<Session> get sleepSessions =>
-      _sessionsOf(EventType.sleepStart, EventType.sleepEnd);
+      _sleepCache ??= _sessionsOf(EventType.sleepStart, EventType.sleepEnd);
 
   List<Session> get feedSessions =>
-      _sessionsOf(EventType.feedStart, EventType.feedEnd);
+      _feedCache ??= _sessionsOf(EventType.feedStart, EventType.feedEnd);
+
+  Map<DateTime, DailyStats> _byDay() => _byDayCache ??= _computeByDay();
 
   /// Group completed sessions by calendar day (by their start time).
-  Map<DateTime, DailyStats> _byDay() {
+  Map<DateTime, DailyStats> _computeByDay() {
     final out = <DateTime, DailyStats>{};
 
     DateTime keyOf(DateTime t) => dayKeyFor(t, dayStartHour);
@@ -129,11 +140,9 @@ class Statistics {
     return out;
   }
 
-  List<DailyStats> get dailyStats {
-    final m = _byDay();
-    final days = m.values.toList()..sort((a, b) => b.day.compareTo(a.day));
-    return days;
-  }
+  List<DailyStats> get dailyStats => _dailyStatsCache ??= (_byDay().values
+      .toList()
+    ..sort((a, b) => b.day.compareTo(a.day)));
 
   /// Average of completed sleep session durations across all time.
   Duration get avgSleepDuration {

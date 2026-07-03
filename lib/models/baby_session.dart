@@ -29,7 +29,14 @@ class BabySession {
   });
 
   bool get isOngoing => end == null;
-  Duration? get duration => end?.difference(start);
+
+  /// Clamped to zero: an out-of-order edited/synced end (before its start)
+  /// must never produce a negative duration that corrupts daily totals.
+  Duration? get duration {
+    if (end == null) return null;
+    final d = end!.difference(start);
+    return d.isNegative ? Duration.zero : d;
+  }
 
   /// Pair start/end events into sessions, in chronological order.
   /// If a start has no end, it becomes an ongoing session.

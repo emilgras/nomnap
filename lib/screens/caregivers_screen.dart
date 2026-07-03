@@ -50,19 +50,28 @@ class _CaregiversScreenState extends State<CaregiversScreen> {
     final origin = box != null && box.hasSize
         ? box.localToGlobal(Offset.zero) & box.size
         : null;
-    await Share.share(
-      s.shareInviteText(code),
-      subject: s.shareInviteSubject,
-      sharePositionOrigin: origin,
-    );
+    try {
+      await Share.share(
+        s.shareInviteText(code),
+        subject: s.shareInviteSubject,
+        sharePositionOrigin: origin,
+      );
+    } catch (_) {
+      // Sharing is best-effort; a platform-channel failure shouldn't crash.
+      _toast(s.errUpdate);
+    }
   }
 
   Future<void> _copyInvite() async {
     final code = _inviteCode;
     if (code == null) return;
     final s = S.of(context);
-    await Clipboard.setData(ClipboardData(text: code));
-    _toast(s.codeCopied);
+    try {
+      await Clipboard.setData(ClipboardData(text: code));
+      _toast(s.codeCopied);
+    } catch (_) {
+      _toast(s.errUpdate);
+    }
   }
 
   Future<void> _join(SessionScope session) async {
@@ -208,6 +217,22 @@ class _CaregiversScreenState extends State<CaregiversScreen> {
               child: StreamBuilder<List<Member>>(
                 stream: session.households.watchMembers(session.householdId),
                 builder: (context, snap) {
+                  if (snap.hasError) {
+                    // The stream errors when membership is lost (you left or
+                    // were removed) or on a network failure — show a message
+                    // instead of spinning forever.
+                    return Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Center(
+                        child: Text(
+                          s.errLoadCaregivers,
+                          textAlign: TextAlign.center,
+                          style: AppText.footnote
+                              .copyWith(color: AppColors.textSecondary),
+                        ),
+                      ),
+                    );
+                  }
                   final members = snap.data;
                   if (members == null) {
                     return const Padding(

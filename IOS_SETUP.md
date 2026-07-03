@@ -206,8 +206,11 @@ Produces `build/ios/archive/Runner.xcarchive` and an `.ipa` in
 Then in **App Store Connect**:
 - Create the app record (bundle `com.nomnap.app`).
 - Fill the listing — reuse `STORE_LISTING.md`.
-- Complete the **privacy** questionnaire: **no data collected** — all data is
-  local or in the user's own Firebase household.
+- Complete the **privacy** questionnaire accurately: the app stores logged
+  activity in **your Firebase project** (Firestore, EU) under an anonymous
+  sign-in, plus Crashlytics diagnostics and an optional feedback email. It is
+  **not** "no data collected." Use the per-type answers in `STORE_LISTING.md`
+  (all "not linked to you", "not used for tracking").
 - Link the privacy policy: https://emilgras.github.io/nomnap/privacy.html
 - Submit to TestFlight (internal testing) or App Review.
 

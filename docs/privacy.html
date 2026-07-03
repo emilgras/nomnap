@@ -25,60 +25,120 @@
 <body>
   <header><h1>NomNap — Privacy Policy</h1></header>
   <div class="wrap">
-    <p class="muted">Last updated: 14 June 2026</p>
+    <p class="muted">Last updated: 3 July 2026</p>
 
     <p>
-      NomNap is a baby sleep &amp; feed tracker. We designed it to be private by
-      default. This policy explains what the app does and does not do with your
-      information.
+      NomNap is a baby sleep, feed, and diaper tracker for parents and
+      caregivers. We keep data collection to the minimum needed to make the app
+      work, and we never sell your data or use it for advertising. This policy
+      explains what we store, where, and why.
     </p>
 
-    <h2>Data we collect</h2>
+    <h2>No sign-up, no personal account</h2>
     <p>
-      <strong>None.</strong> NomNap does not collect, transmit, or sell any
-      personal information. We have no servers, no user accounts, and no
-      analytics or advertising SDKs.
+      You don't create an account or give us your name, email, or phone number to
+      use NomNap. On first launch the app signs in <strong>anonymously</strong>
+      through Firebase Authentication, which issues a random, anonymous identifier
+      for your device. That identifier is not linked to your real-world identity.
     </p>
 
-    <h2>Where your data lives</h2>
+    <h2>What we store, and where</h2>
     <p>
-      Everything you record in NomNap — sleep sessions, feeds, diaper changes —
-      is stored <strong>locally on your device only</strong>. It never leaves
-      your device unless you explicitly choose to export it.
+      To let you keep your log in sync and optionally share it with another
+      caregiver, the activity you record is stored in
+      <strong>Google Firebase (Cloud Firestore)</strong>, hosted in the
+      <strong>European Union</strong>. Google acts as our data processor. The
+      data is associated only with the anonymous identifier described above.
+    </p>
+    <p>We store:</p>
+    <ul>
+      <li><strong>Activity you log</strong> — sleep sessions, feeds, diaper
+        changes, and growth measurements (such as weight and length), each with a
+        timestamp.</li>
+      <li><strong>An optional baby name</strong>, only if you choose to enter one.
+        You can leave it blank.</li>
+      <li><strong>Household &amp; sharing data</strong> — a random household ID,
+        the anonymous IDs of caregivers who have joined it, and any invite codes
+        you generate to share access.</li>
+    </ul>
+    <p>
+      We do <strong>not</strong> ask for or store your name, email address, phone
+      number, contacts, location, photos, or precise device identifiers as part
+      of normal use.
+    </p>
+
+    <h2>Offline use &amp; local cache</h2>
+    <p>
+      NomNap works offline. Your data is cached on your device so the app keeps
+      working without a connection, and changes sync to Firestore automatically
+      when you're back online.
+    </p>
+
+    <h2>Sharing with caregivers</h2>
+    <p>
+      If you create an invite code and share it with another person, redeeming
+      that code lets their device join your household and see and edit the same
+      log. Only people you share a code with can access your data. You control who
+      you invite.
+    </p>
+
+    <h2>Crash and diagnostic data</h2>
+    <p>
+      To find and fix bugs, NomNap uses <strong>Firebase Crashlytics</strong>,
+      which collects crash reports and basic diagnostic information (such as the
+      type of crash, device model, and operating system version) when the app
+      crashes. This data is not used to identify you and is not used for
+      advertising or tracking. Crash reporting is disabled in development builds.
+    </p>
+
+    <h2>Optional feedback</h2>
+    <p>
+      If you send feedback from within the app, we store the message you write. If
+      you also choose to include your <strong>email address</strong> so we can
+      reply, we store that email for that purpose only. Leaving the email blank is
+      fine — feedback can be sent anonymously.
     </p>
 
     <h2>Backups &amp; export</h2>
     <p>
       NomNap lets you export your data to a <code>.json</code> backup file and
-      import it again. When you tap export, your device's standard share sheet
-      opens and <em>you</em> decide where the file goes (Files, iCloud/Drive,
-      email, etc.). NomNap has no visibility into or control over that
-      destination, and we never receive a copy.
+      import it again. When you export, your device's standard share sheet opens
+      and <em>you</em> decide where the file goes (Files, iCloud/Drive, email,
+      etc.). We never receive a copy of exported files.
     </p>
 
-    <h2>Permissions</h2>
+    <h2>Data retention &amp; deletion</h2>
     <p>
-      NomNap only accesses files you explicitly pick (for import) or save (for
-      export) through the system file picker and share sheet. It does not access
-      your contacts, location, camera, photos, or microphone.
+      Your data stays in Firestore so it's available across your devices and to
+      caregivers you've invited. You can delete individual entries in the app at
+      any time. To have your household's data deleted entirely, email us at the
+      address below and we'll remove it.
+    </p>
+
+    <h2>Tracking &amp; advertising</h2>
+    <p>
+      <strong>None.</strong> NomNap contains no advertising SDKs, no third-party
+      analytics for marketing, and does not track you across other apps or
+      websites.
     </p>
 
     <h2>Children's privacy</h2>
     <p>
-      NomNap is a tool for parents and caregivers. It does not knowingly collect
-      any information from children, and indeed collects no information from
-      anyone.
+      NomNap is intended for use by parents and caregivers, not by children. The
+      information you enter is about your child and is provided by you as the
+      parent or guardian. We do not knowingly allow children to create or use the
+      app themselves.
     </p>
 
     <h2>Changes to this policy</h2>
     <p>
-      If this policy changes, the updated version will be posted on this page
-      with a new "last updated" date.
+      If this policy changes, the updated version will be posted on this page with
+      a new "last updated" date.
     </p>
 
     <h2>Contact</h2>
     <p>
-      Questions about privacy? Email
+      Questions about privacy, or want your data deleted? Email
       <a href="mailto:emil.gras@gmail.com">emil.gras@gmail.com</a>.
     </p>
   </div>

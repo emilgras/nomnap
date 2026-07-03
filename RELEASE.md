@@ -102,9 +102,11 @@ These were fixed during the first production review; keep them intact.
 7. iOS (needs macOS + Xcode or a cloud builder like Codemagic): add the Firebase
    plist (Gotcha #3), build, sign, and archive.
 8. Store-side: upload the artifact, update `STORE_LISTING.md` content, refresh
-   screenshots / Play feature graphic, complete the Data safety form
-   (**no data collected** — all data is local or in the user's own Firebase
-   household).
+   screenshots / Play feature graphic, and complete the privacy / Data safety
+   form **accurately**: activity is stored in the app's Firebase project
+   (Firestore, EU) under anonymous auth, plus Crashlytics diagnostics and an
+   optional feedback email — **not** "no data collected." See the per-type
+   answers in `STORE_LISTING.md`.
 9. Keep `docs/privacy.html` alive — it's linked from the store listings and must
    survive any `docs/` rebuild.
 

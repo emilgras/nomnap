@@ -54,3 +54,6 @@ app.*.map.json
 
 # GitHub Pages serves from here — don't ignore even though /build/ is ignored
 !/docs/
+
+# Claude Code personal settings
+.claude/settings.local.json

@@ -1224,7 +1224,7 @@ class S {
 
   String get onboardingWelcomeTitle => _t(
       en: 'Welcome, little one 💜',
-      da: 'Velkommen, lille skat 💜',
+      da: 'Velkommen, lille ven 💜',
       nb: 'Velkommen, lille venn 💜',
       sv: 'Välkommen, lilla vän 💜',
       fi: 'Tervetuloa, pikkuinen 💜',
@@ -1266,6 +1266,13 @@ class S {
       sv: 'När föddes $name?',
       fi: 'Milloin $name syntyi?',
       isl: 'Hvenær fæddist $name?');
+  String get onboardingBirthFutureError => _t(
+      en: 'Birth date can’t be in the future',
+      da: 'Fødselsdato kan ikke være i fremtiden',
+      nb: 'Fødselsdato kan ikke være i fremtiden',
+      sv: 'Födelsedatum kan inte vara i framtiden',
+      fi: 'Syntymäpäivä ei voi olla tulevaisuudessa',
+      isl: 'Fæðingardagur getur ekki verið í framtíðinni');
 
   String get onboardingSexTitle => _t(
       en: 'Boy or girl?',

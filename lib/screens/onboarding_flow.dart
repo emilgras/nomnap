@@ -156,6 +156,25 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   Future<void> _next() async {
     FocusScope.of(context).unfocus();
+    // Validate the birth date here rather than clamping the picker, so the
+    // wheels scroll naturally and the user is told only when they try to move on.
+    if (_current == _Step.birth && _birthDate.isAfter(_today())) {
+      final s = S.of(context);
+      HapticFeedback.heavyImpact();
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          content: Text(s.onboardingBirthFutureError),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(s.ok),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     if (_isLast) {
       _finish();
       return;
@@ -534,7 +553,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           mode: CupertinoDatePickerMode.date,
           initialDateTime: _birthDate,
           minimumDate: DateTime(DateTime.now().year - 5),
-          maximumDate: _today(),
+          // No maximumDate: clamping the picker to "today" makes the day/month
+          // wheels snap back mid-scroll (e.g. picking day 29 in the current
+          // month resolves to a future date and jumps back). We allow scrolling
+          // freely and reject a future birth date on the Next button instead.
+          maximumDate: DateTime(DateTime.now().year + 1),
           onDateTimeChanged: (d) =>
               _birthDate = DateTime(d.year, d.month, d.day),
         ),

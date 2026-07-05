@@ -278,7 +278,8 @@ class _TrackerScreenState extends State<TrackerScreen> {
     // when nothing relevant is enabled.
     final enabled = config.enabledInOrder.toSet();
     final showSleep = enabled.contains(TrackerKind.sleep);
-    final showFeed = enabled.contains(TrackerKind.feed) ||
+    final breastEnabled = enabled.contains(TrackerKind.feed);
+    final showFeed = breastEnabled ||
         enabled.contains(TrackerKind.bottle) ||
         enabled.contains(TrackerKind.tube);
     final showDiaper = enabled.contains(TrackerKind.diaper);
@@ -385,6 +386,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
                     daily: today,
                     showSleep: showSleep,
                     showFeed: showFeed,
+                    breastEnabled: breastEnabled,
                     showDiaper: showDiaper,
                   ),
                 ],
@@ -1150,11 +1152,15 @@ class _TodaySummary extends StatelessWidget {
   final DailyStats? daily;
   final bool showSleep;
   final bool showFeed;
+  // When the breastfeed tracker is off, the feed tile counts all meals
+  // (bottle/tube + any nursing) instead of nursing sessions only.
+  final bool breastEnabled;
   final bool showDiaper;
   const _TodaySummary({
     required this.daily,
     required this.showSleep,
     required this.showFeed,
+    required this.breastEnabled,
     required this.showDiaper,
   });
 
@@ -1162,9 +1168,13 @@ class _TodaySummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final sleeps = daily?.sleepCount ?? 0;
-    final feeds = daily?.feedCount ?? 0;
     final sleepTotal = daily?.sleepTotal ?? Duration.zero;
-    final feedTotal = daily?.feedTotal ?? Duration.zero;
+    final feeds =
+        breastEnabled ? (daily?.feedCount ?? 0) : (daily?.totalFeedCount ?? 0);
+    final feedLabel = breastEnabled ? s.feedPlural(feeds) : s.mealPlural(feeds);
+    final feedDetail = breastEnabled
+        ? formatDuration(daily?.feedTotal ?? Duration.zero)
+        : s.amountMl('${daily?.volumeMl ?? 0}');
     final pees = daily?.peeCount ?? 0;
     final poops = daily?.poopCount ?? 0;
 
@@ -1184,8 +1194,8 @@ class _TodaySummary extends StatelessWidget {
           accent: AppColors.feedAccent,
           softBg: AppColors.feedSoft,
           value: '$feeds',
-          label: s.feedPlural(feeds),
-          detail: formatDuration(feedTotal),
+          label: feedLabel,
+          detail: feedDetail,
         ),
       if (showDiaper)
         _StatTile(

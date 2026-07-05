@@ -332,6 +332,17 @@ class S {
           sv: 'Amningar',
           fi: 'Imetykset',
           isl: 'Brjóstagjafir');
+  // Used on the TODAY tile when breastfeeding is disabled, so bottle/tube
+  // feeds aren't labeled as breastfeeds.
+  String mealPlural(int n) => n == 1
+      ? _t(en: 'Meal', da: 'Måltid', nb: 'Måltid', sv: 'Måltid', fi: 'Ateria', isl: 'Máltíð')
+      : _t(
+          en: 'Meals',
+          da: 'Måltider',
+          nb: 'Måltider',
+          sv: 'Måltider',
+          fi: 'Ateriat',
+          isl: 'Máltíðir');
   String diaperPlural(int n) => n == 1
       ? diaper
       : _t(
